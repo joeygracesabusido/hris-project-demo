@@ -31,10 +31,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import FaceCapture from '@/components/facial-recognition/FaceCapture';
 import { useEmployees, useCreateEmployee, useUpdateEmployee, useDeleteEmployee, useEnrollFace } from '@/hooks/use-employees';
+import { useDepartments } from '@/hooks/use-departments';
+import { useSubDepartments } from '@/hooks/use-sub-departments';
+import { useProjects } from '@/hooks/use-projects';
 import { getClientCookies } from '@/lib/client-cookies';
 import type { Employee } from '@/hooks/use-employees';
 
-const departments = ['IT', 'HR', 'Finance', 'Marketing', 'Operations', 'Sales', 'Engineering', 'Admin'];
 const frequencies = [
   { value: 'WEEKLY', label: 'Weekly' },
   { value: 'SEMIMONTHLY', label: 'Semi-monthly' },
@@ -42,7 +44,7 @@ const frequencies = [
 ];
 
 const initialForm = {
-  employeeId: '', fullName: '', email: '', position: '', department: '',
+  employeeId: '', fullName: '', email: '', position: '',
   payType: 'MONTHLY', basicSalary: '', dailyRate: '',
   payrollFrequency: 'MONTHLY', managerId: '', hireDate: '',
   tin: '', sssNo: '', philhealthNo: '', pagibigNo: '',
@@ -68,6 +70,13 @@ export default function EmployeesPage() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [faceEnrollStatus, setFaceEnrollStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [formData, setFormData] = useState({ ...initialForm });
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
+  const [selectedSubDepartmentId, setSelectedSubDepartmentId] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+
+  const { data: departments = [] } = useDepartments()
+  const { data: subDepartments = [] } = useSubDepartments(selectedDepartmentId || undefined)
+  const { data: projects = [] } = useProjects(selectedSubDepartmentId || undefined)
 
   useEffect(() => {
     const cookies = getClientCookies();
@@ -87,19 +96,20 @@ export default function EmployeesPage() {
     e.preventDefault();
     setError('');
 
-    const payload = {
-      ...(selectedEmployee ? { id: selectedEmployee.id } : {}),
+    const basePayload = {
       ...formData,
+      subDepartmentId: selectedSubDepartmentId,
+      projectId: selectedProjectId || undefined,
       basicSalary: parseFloat(formData.basicSalary || '0'),
       dailyRate: parseFloat(formData.dailyRate || '0'),
-      managerId: formData.managerId || null
+      managerId: formData.managerId || undefined
     };
 
     if (selectedEmployee) {
-      const result = await updateEmployee.mutateAsync(payload);
+      const result = await updateEmployee.mutateAsync({ id: selectedEmployee.id, ...basePayload });
       if (result?.error) { setError(result.error); return; }
     } else {
-      const result = await createEmployee.mutateAsync(payload);
+      const result = await createEmployee.mutateAsync(basePayload);
       if (result?.error) { setError(result.error); return; }
     }
 
@@ -108,7 +118,12 @@ export default function EmployeesPage() {
     setFormData({ ...initialForm });
   };
 
-  const resetForm = () => setFormData({ ...initialForm });
+  const resetForm = () => {
+    setFormData({ ...initialForm });
+    setSelectedDepartmentId('');
+    setSelectedSubDepartmentId('');
+    setSelectedProjectId('');
+  };
 
   const handleEdit = (employee: Employee) => {
     if (userRole === 'EMPLOYEE') {
@@ -122,7 +137,6 @@ export default function EmployeesPage() {
       fullName: employee.fullName,
       email: employee.email,
       position: employee.position,
-      department: employee.department,
       payType: employee.payType || 'MONTHLY',
       basicSalary: employee.basicSalary?.toString() || '0',
       dailyRate: employee.dailyRate?.toString() || '0',
@@ -138,6 +152,9 @@ export default function EmployeesPage() {
       employeeStatus: employee.employeeStatus || 'PROBATIONARY',
       regularizationDate: employee.regularizationDate ? employee.regularizationDate.split('T')[0] : '',
     });
+    setSelectedSubDepartmentId(employee.subDepartmentId || '')
+    setSelectedProjectId(employee.projectId || '')
+    setSelectedDepartmentId((employee.subDepartment as { departmentId?: string })?.departmentId || '')
     setShowModal(true);
   };
 
@@ -228,7 +245,7 @@ export default function EmployeesPage() {
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Department</p>
-                    <p className="font-medium text-gray-700">{employee.department}</p>
+                    <p className="font-medium text-gray-700">{employee.subDepartment?.name || '-'}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Pay Type</p>
@@ -315,7 +332,7 @@ export default function EmployeesPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm font-medium text-gray-600">{employee.department}</TableCell>
+                    <TableCell className="text-sm font-medium text-gray-600">{employee.subDepartment?.name || '-'}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <Badge variant={
@@ -388,15 +405,59 @@ export default function EmployeesPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Department *</Label>
                     <Select
-                      value={formData.department}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
+                      value={selectedDepartmentId}
+                      onValueChange={(value) => {
+                        setSelectedDepartmentId(value)
+                        setSelectedSubDepartmentId('')
+                        setSelectedProjectId('')
+                      }}
                       disabled={userRole === 'EMPLOYEE'}
                     >
                       <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        {departments.filter(d => d.isActive).map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold uppercase text-slate-400">Sub-Department *</Label>
+                    <Select
+                      value={selectedSubDepartmentId}
+                      onValueChange={(value) => {
+                        setSelectedSubDepartmentId(value)
+                        setSelectedProjectId('')
+                      }}
+                      disabled={!selectedDepartmentId || userRole === 'EMPLOYEE'}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
+                        <SelectValue placeholder={selectedDepartmentId ? 'Select Sub-Department' : 'Select a department first'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subDepartments.filter(sd => sd.isActive).map(sd => (
+                          <SelectItem key={sd.id} value={sd.id}>{sd.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold uppercase text-slate-400">Project</Label>
+                    <Select
+                      value={selectedProjectId}
+                      onValueChange={(value) => setSelectedProjectId(value === '__none__' ? '' : value)}
+                      disabled={!selectedSubDepartmentId || userRole === 'EMPLOYEE'}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
+                        <SelectValue placeholder={selectedSubDepartmentId ? 'Select Project (optional)' : 'Select a sub-department first'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No project</SelectItem>
+                        {projects.filter(p => p.isActive).map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
