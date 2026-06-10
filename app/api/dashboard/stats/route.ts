@@ -17,7 +17,7 @@ interface DashboardStats {
     isPresent: boolean;
     isOnLeave: boolean;
     employeeName?: string;
-    department?: string;
+    subDepartment?: string;
   };
 }
 
@@ -48,8 +48,10 @@ export async function GET(request: Request) {
       },
       select: {
         id: true,
-        department: true,
         fullName: true,
+        subDepartment: {
+          select: { name: true },
+        },
       },
     });
 
@@ -102,7 +104,7 @@ export async function GET(request: Request) {
         onLeaveToday: isOnLeave ? 1 : 0,
         absentPerDepartment: isPresent || isOnLeave ? [] : [
           {
-            name: employee?.department || 'Unassigned',
+            name: employee?.subDepartment?.name || 'Unassigned',
             absent: 1,
             total: 1,
           },
@@ -111,7 +113,7 @@ export async function GET(request: Request) {
           isPresent,
           isOnLeave,
           employeeName: employee?.fullName,
-          department: employee?.department,
+          subDepartment: employee?.subDepartment?.name,
         },
       };
     } else {
@@ -119,7 +121,7 @@ export async function GET(request: Request) {
       const departmentStats: Record<string, { total: number; present: number; absent: number; onLeave: number }> = {};
 
       employees.forEach((emp) => {
-        const dept = emp.department || 'Unassigned';
+        const dept = emp.subDepartment?.name || 'Unassigned';
         if (!departmentStats[dept]) {
           departmentStats[dept] = { total: 0, present: 0, absent: 0, onLeave: 0 };
         }

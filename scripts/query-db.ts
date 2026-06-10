@@ -38,7 +38,9 @@ async function main() {
       fullName: true,
       email: true,
       position: true,
-      department: true,
+      subDepartment: {
+        select: { name: true },
+      },
       isActive: true,
       faceDescriptor: true,
       user: true,
@@ -53,7 +55,7 @@ async function main() {
     console.log(`  Name: ${emp.fullName}`)
     console.log(`  Email: ${emp.email}`)
     console.log(`  Position: ${emp.position}`)
-    console.log(`  Department: ${emp.department}`)
+    console.log(`  Department: ${emp.subDepartment?.name ?? 'N/A'}`)
     console.log(`  Active: ${emp.isActive}`)
     console.log(`  Face Descriptor Enrolled: ${hasFace ? 'YES' : 'NO'}`)
     if (hasFace) {

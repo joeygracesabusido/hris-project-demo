@@ -289,7 +289,9 @@ export async function POST(request: Request) {
     });
 
     if (employeeId === 'all') {
-      const employees = await prisma.employee.findMany();
+      const employees = await prisma.employee.findMany({
+        include: { subDepartment: { select: { name: true } } },
+      });
       const results = [];
       const errors = [];
 
@@ -310,7 +312,7 @@ export async function POST(request: Request) {
               fullName: employee.fullName,
               employeeNumber: employee.employeeNumber,
               position: employee.position,
-              department: employee.department,
+              department: employee.subDepartment?.name ?? null,
               payType: employee.payType,
               dailyRate: result.dailyRate
             },

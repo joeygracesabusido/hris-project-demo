@@ -31,7 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubDepartments, useCreateSubDepartment, useUpdateSubDepartment, useDeleteSubDepartment } from '@/hooks/use-sub-departments';
 import { useDepartments } from '@/hooks/use-departments';
 import { getClientCookies } from '@/lib/client-cookies';
-import { hasAdminAccess } from '@/lib/auth-helpers';
+import { hasAdminAccess } from '@/lib/auth-shared';
 import type { SubDepartment } from '@/hooks/use-sub-departments';
 import type { Department } from '@/hooks/use-departments';
 

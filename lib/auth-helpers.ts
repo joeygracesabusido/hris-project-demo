@@ -1,21 +1,9 @@
 import prisma from '@/lib/prisma'
-import type { Role } from '@prisma/client'
 import { cookies } from 'next/headers'
 import { getEmployeeIdForUser } from '@/lib/user-employee-link'
+import { ADMIN_ROLES, hasAdminAccess } from '@/lib/auth-shared'
 
-/**
- * Roles that have full data access (not filtered to personal data)
- */
-export const ADMIN_ROLES: Role[] = ['ADMIN', 'HR', 'MANAGER']
-
-/**
- * Check if user has admin-level access
- * @param userRole - The role of the logged-in user
- * @returns true if user can access all data, false if restricted to personal data
- */
-export function hasAdminAccess(userRole: string): boolean {
-  return ADMIN_ROLES.includes(userRole as Role)
-}
+export { ADMIN_ROLES, hasAdminAccess }
 
 /**
  * Get the employee ID for a user's personal data filtering

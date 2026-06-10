@@ -27,13 +27,15 @@ async function main() {
     },
   })
 
-  if (!rawResult || rawResult.length === 0) {
+  if (!rawResult || (rawResult as unknown as Array<Record<string, unknown>>).length === 0) {
     console.log('No employees need migration. Exiting.')
     return
   }
 
+  const rawArray = rawResult as unknown as Array<Record<string, unknown>>
+
   // Extract employees - findRaw returns { _id: { $oid: "..." }, ... }
-  const existingEmployees = rawResult.map((rec: Record<string, unknown>) => {
+  const existingEmployees = rawArray.map((rec: Record<string, unknown>) => {
     const idObj = rec._id as { $oid: string }
     return {
       id: idObj.$oid,

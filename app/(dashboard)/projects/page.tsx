@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/use-projects';
 import { useSubDepartments } from '@/hooks/use-sub-departments';
 import { getClientCookies } from '@/lib/client-cookies';
-import { hasAdminAccess } from '@/lib/auth-helpers';
+import { hasAdminAccess } from '@/lib/auth-shared';
 import type { Project } from '@/hooks/use-projects';
 import type { SubDepartment } from '@/hooks/use-sub-departments';
 

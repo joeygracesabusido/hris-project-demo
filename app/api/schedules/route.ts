@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
         id: true,
         fullName: true,
         position: true,
-        department: true,
+        subDepartment: {
+          select: { name: true },
+        },
       },
       orderBy: { fullName: 'asc' },
     });
