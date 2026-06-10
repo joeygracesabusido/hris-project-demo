@@ -29,6 +29,12 @@ const navItems = [
     subItems: [
       { href: '/employees', label: 'Employees', icon: Users, iconColor: 'text-blue-400', adminOnly: true },
       { href: '/gov-info', label: 'Government Info', icon: ShieldCheck, iconColor: 'text-blue-400' },
+      {
+        label: 'Approvers',
+        href: '/approver',
+        icon: ShieldCheck,
+        adminOnly: true,
+      },
     ],
   },
   {
@@ -123,7 +129,12 @@ export default function DashboardLayout({
     const Icon = item.icon;
 
     if (item.subItems) {
-      const isMasterListActive = pathname.startsWith('/employees') || pathname.startsWith('/gov-info');
+      const isMasterListActive = pathname.startsWith('/employees') ||
+        pathname.startsWith('/departments') ||
+        pathname.startsWith('/sub-departments') ||
+        pathname.startsWith('/projects') ||
+        pathname.startsWith('/gov-info') ||
+        pathname.startsWith('/approver');
       const isHrisActive = pathname.startsWith('/users') || pathname.startsWith('/schedules') || pathname.startsWith('/leave-credits') || pathname.startsWith('/leaves') || pathname.startsWith('/overtime') || pathname.startsWith('/time-logs') || pathname.startsWith('/holidays') || pathname.startsWith('/departments') || pathname.startsWith('/sub-departments') || pathname.startsWith('/projects');
       const isPayrollActive = pathname.startsWith('/payroll');
       const isReportsActive = pathname.startsWith('/reports');
