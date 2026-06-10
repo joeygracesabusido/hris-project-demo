@@ -49,7 +49,7 @@ export default function SubDepartmentsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedSubDepartment, setSelectedSubDepartment] = useState<SubDepartment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
   const [userRole, setUserRole] = useState<string>('');
   const [formData, setFormData] = useState({ ...initialForm });
 
@@ -110,7 +110,7 @@ export default function SubDepartmentsPage() {
 
   const filteredSubDepartments = subDepartments.filter(sd => {
     const matchesSearch = sd.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = !departmentFilter || sd.departmentId === departmentFilter;
+    const matchesDept = departmentFilter === 'all' || sd.departmentId === departmentFilter;
     return matchesSearch && matchesDept;
   });
 
@@ -142,7 +142,7 @@ export default function SubDepartmentsPage() {
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Departments</SelectItem>
+              <SelectItem value="all">All Departments</SelectItem>
               {departments.filter((d: Department) => d.isActive).map((dept: Department) => (
                 <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
               ))}

@@ -50,7 +50,7 @@ export default function ProjectsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [subDepartmentFilter, setSubDepartmentFilter] = useState('');
+  const [subDepartmentFilter, setSubDepartmentFilter] = useState('all');
   const [userRole, setUserRole] = useState<string>('');
   const [formData, setFormData] = useState({ ...initialForm });
 
@@ -115,7 +115,7 @@ export default function ProjectsPage() {
 
   const filteredProjects = projects.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSubDept = !subDepartmentFilter || p.subDepartmentId === subDepartmentFilter;
+    const matchesSubDept = subDepartmentFilter === 'all' || p.subDepartmentId === subDepartmentFilter;
     return matchesSearch && matchesSubDept;
   });
 
@@ -147,7 +147,7 @@ export default function ProjectsPage() {
               <SelectValue placeholder="All Sub-Departments" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Sub-Departments</SelectItem>
+              <SelectItem value="all">All Sub-Departments</SelectItem>
               {subDepartments.filter((sd: SubDepartment) => sd.isActive).map((sd: SubDepartment) => (
                 <SelectItem key={sd.id} value={sd.id}>{sd.name}</SelectItem>
               ))}
