@@ -30,10 +30,14 @@ export default function GovernmentInfoPage() {
 
   useEffect(() => {
     const cookies = getClientCookies();
+    if (!cookies.isLoggedIn) {
+      window.location.href = '/login';
+      return;
+    }
     setUserRole(cookies.userRole || '');
   }, []);
 
-  const isAdminOrHR = userRole === 'ADMIN' || userRole === 'HR';
+  const isAdminOrHRorManager = userRole === 'ADMIN' || userRole === 'HR' || userRole === 'MANAGER';
 
   const { data: govInfoData, isLoading: loadingGovInfo } = useGovInfo(
     departmentFilter === 'all' ? undefined : departmentFilter
@@ -78,7 +82,7 @@ export default function GovernmentInfoPage() {
               />
             </div>
 
-            {isAdminOrHR && (
+            {isAdminOrHRorManager && (
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-muted-foreground" />
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
@@ -105,7 +109,7 @@ export default function GovernmentInfoPage() {
                 <TableHead>Employee ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
-                {isAdminOrHR && (
+                {isAdminOrHRorManager && (
                   <>
                     <TableHead>SSS No.</TableHead>
                     <TableHead>PhilHealth No.</TableHead>
@@ -123,7 +127,7 @@ export default function GovernmentInfoPage() {
                   <TableCell className="font-mono">{emp.employeeId}</TableCell>
                   <TableCell>{emp.fullName}</TableCell>
                   <TableCell>{emp.subDepartment?.department?.name || '—'}</TableCell>
-                  {isAdminOrHR && (
+                  {isAdminOrHRorManager && (
                     <>
                       <TableCell>{emp.sssNo || '—'}</TableCell>
                       <TableCell>{emp.philhealthNo || '—'}</TableCell>
