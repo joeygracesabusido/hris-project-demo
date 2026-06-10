@@ -74,15 +74,15 @@ export async function resolveApprovalChain(
     })
     const employeeMap = new Map(employees.map(e => [e.id, { fullName: e.fullName, isActive: e.isActive }]))
 
-    const chain: ResolvedApprover[] = []
-    const seenApproverIds = new Set<string>()
+    // First pass: resolve delegation for each rule, collect all resolved approverIds
+    const resolvedApproverIds = new Set<string>()
+    const ruleResolutions: Array<{ rule: (typeof rules)[number]; approverId: string }> = []
 
     for (const rule of rules) {
       if (!rule.approverId) continue
 
       let approverId = rule.approverId
 
-      // Check delegation
       if (requestDate) {
         const delegatedTo = await checkDelegation(approverId, requestType, requestDate, requestDate)
         if (delegatedTo) {
@@ -90,24 +90,38 @@ export async function resolveApprovalChain(
         }
       }
 
-      // Skip if approver is the requestor
+      resolvedApproverIds.add(approverId)
+      ruleResolutions.push({ rule, approverId })
+    }
+
+    // Batch fetch any delegated-to approvers not in the original batch
+    const missingIds = [...resolvedApproverIds].filter(id => !employeeMap.has(id))
+    if (missingIds.length > 0) {
+      const missingEmployees = await prisma.employee.findMany({
+        where: { id: { in: missingIds } },
+        select: { id: true, fullName: true, isActive: true },
+      })
+      for (const emp of missingEmployees) {
+        employeeMap.set(emp.id, { fullName: emp.fullName, isActive: emp.isActive })
+      }
+    }
+
+    // Second pass: build the chain from resolved data
+    const chain: ResolvedApprover[] = []
+    const seenApproverIds = new Set<string>()
+
+    for (const { rule, approverId } of ruleResolutions) {
       if (approverId === employeeId) {
         console.warn(`Approver ${rule.approverId} is the requestor, escalating to next level`)
         continue
       }
 
-      // Skip if approver is not active
-      const approver = employeeMap.get(approverId) ?? await prisma.employee.findUnique({
-        where: { id: approverId },
-        select: { fullName: true, isActive: true },
-      })
-
+      const approver = employeeMap.get(approverId)
       if (!approver?.isActive) {
         console.warn(`Approver ${approverId} is not active, skipping to next level`)
         continue
       }
 
-      // Skip if already in chain
       if (seenApproverIds.has(approverId)) continue
 
       seenApproverIds.add(approverId)
