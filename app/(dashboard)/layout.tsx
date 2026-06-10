@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban, List } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban, List, ShieldCheck } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -28,6 +28,7 @@ const navItems = [
     iconColor: 'text-blue-500',
     subItems: [
       { href: '/employees', label: 'Employees', icon: Users, iconColor: 'text-blue-400', adminOnly: true },
+      { href: '/gov-info', label: 'Government Info', icon: ShieldCheck, iconColor: 'text-blue-400' },
     ],
   },
   {
@@ -122,7 +123,7 @@ export default function DashboardLayout({
     const Icon = item.icon;
 
     if (item.subItems) {
-      const isMasterListActive = pathname.startsWith('/employees');
+      const isMasterListActive = pathname.startsWith('/employees') || pathname.startsWith('/gov-info');
       const isHrisActive = pathname.startsWith('/users') || pathname.startsWith('/schedules') || pathname.startsWith('/leave-credits') || pathname.startsWith('/leaves') || pathname.startsWith('/overtime') || pathname.startsWith('/time-logs') || pathname.startsWith('/holidays') || pathname.startsWith('/departments') || pathname.startsWith('/sub-departments') || pathname.startsWith('/projects');
       const isPayrollActive = pathname.startsWith('/payroll');
       const isReportsActive = pathname.startsWith('/reports');
