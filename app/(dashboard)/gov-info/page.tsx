@@ -44,10 +44,11 @@ export default function GovernmentInfoPage() {
     departmentFilter === 'all' ? undefined : departmentFilter
   );
 
+  const { data: departments, isLoading: loadingDepts } = useDepartments();
+
   if (govInfoError) {
     return <p className="text-destructive">Failed to load government info</p>;
   }
-  const { data: departments, isLoading: loadingDepts } = useDepartments();
 
   const filteredData = govInfoData?.filter((emp) =>
     emp.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
