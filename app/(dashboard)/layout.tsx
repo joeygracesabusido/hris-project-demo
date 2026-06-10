@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -35,6 +35,9 @@ const navItems = [
       { href: '/overtime', label: 'Overtime', icon: Timer, iconColor: 'text-emerald-400' },
       { href: '/time-logs', label: 'Time Logs', icon: Clock, iconColor: 'text-emerald-400' },
       { href: '/holidays', label: 'Holidays', icon: Calendar, iconColor: 'text-emerald-400', adminOnly: true },
+      { href: '/departments', label: 'Departments', icon: Building2, iconColor: 'text-emerald-400' },
+      { href: '/sub-departments', label: 'Sub-Departments', icon: Building, iconColor: 'text-emerald-400' },
+      { href: '/projects', label: 'Projects', icon: FolderKanban, iconColor: 'text-emerald-400' },
     ],
   },
   {
@@ -110,7 +113,7 @@ export default function DashboardLayout({
     const Icon = item.icon;
 
     if (item.subItems) {
-      const isHrisActive = pathname.startsWith('/users') || pathname.startsWith('/employees') || pathname.startsWith('/schedules') || pathname.startsWith('/leave-credits') || pathname.startsWith('/leaves') || pathname.startsWith('/overtime') || pathname.startsWith('/time-logs') || pathname.startsWith('/holidays');
+      const isHrisActive = pathname.startsWith('/users') || pathname.startsWith('/employees') || pathname.startsWith('/schedules') || pathname.startsWith('/leave-credits') || pathname.startsWith('/leaves') || pathname.startsWith('/overtime') || pathname.startsWith('/time-logs') || pathname.startsWith('/holidays') || pathname.startsWith('/departments') || pathname.startsWith('/sub-departments') || pathname.startsWith('/projects');
       const isPayrollActive = pathname.startsWith('/payroll');
       const isReportsActive = pathname.startsWith('/reports');
       
