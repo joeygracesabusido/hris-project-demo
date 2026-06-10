@@ -21,10 +21,11 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
+    const { approverId, requestType, scope, minDays, maxDays, level, departmentId, isActive } = body;
 
     const rule = await prisma.approvalRule.update({
       where: { id },
-      data: body,
+      data: { approverId, requestType, scope, minDays, maxDays, level, departmentId, isActive },
     });
 
     return NextResponse.json(rule);

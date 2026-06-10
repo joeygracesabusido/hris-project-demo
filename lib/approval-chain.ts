@@ -30,7 +30,10 @@ async function checkDelegation(
     where: {
       approverId,
       isActive: true,
-      requestType: requestType ?? undefined,
+      OR: [
+        { requestType: requestType },
+        { requestType: null },
+      ],
       delegationStart: { lte: delegationEnd },
       delegationEnd: { gte: delegationStart },
     },

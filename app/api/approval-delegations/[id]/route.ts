@@ -21,10 +21,11 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
+    const { approverId, delegatedToId, requestType, delegationStart, delegationEnd, isActive } = body;
 
     const delegation = await prisma.approvalDelegation.update({
       where: { id },
-      data: body,
+      data: { approverId, delegatedToId, requestType, delegationStart, delegationEnd, isActive },
     });
 
     return NextResponse.json(delegation);

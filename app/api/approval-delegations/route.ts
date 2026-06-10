@@ -4,6 +4,14 @@ import { getRequestSession, hasAdminAccess } from '@/lib/auth-helpers';
 
 export async function GET(request: Request) {
   try {
+    let userRole: string;
+    try {
+      const session = await getRequestSession(request);
+      userRole = session.userRole;
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const approverId = searchParams.get('approverId');
 
