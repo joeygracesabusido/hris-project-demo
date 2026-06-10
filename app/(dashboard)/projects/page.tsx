@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Trash2, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -68,6 +69,10 @@ export default function ProjectsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.subDepartmentId) {
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Sub-department is required.' });
+      return;
+    }
     try {
       if (selectedProject) {
         await updateProject.mutateAsync({ id: selectedProject.id, ...formData });
@@ -282,12 +287,12 @@ export default function ProjectsPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase text-slate-500">Description</Label>
-              <textarea
+              <Textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
                 placeholder="Optional description..."
-                className="w-full h-24 px-3 py-2 text-sm rounded-lg border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-24"
               />
             </div>
 
