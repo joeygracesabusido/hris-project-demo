@@ -38,7 +38,6 @@ export default function DepartmentsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [error, setError] = useState('');
   const [userRole, setUserRole] = useState<string>('');
   const [formData, setFormData] = useState({ ...initialForm });
 
@@ -57,19 +56,19 @@ export default function DepartmentsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (selectedDepartment) {
-      const result = await updateDepartment.mutateAsync({ id: selectedDepartment.id, ...formData });
-      if (result?.error) { setError(result.error); return; }
-    } else {
-      const result = await createDepartment.mutateAsync(formData);
-      if (result?.error) { setError(result.error); return; }
+    try {
+      if (selectedDepartment) {
+        await updateDepartment.mutateAsync({ id: selectedDepartment.id, ...formData });
+      } else {
+        await createDepartment.mutateAsync(formData);
+      }
+      setShowModal(false);
+      setSelectedDepartment(null);
+      setFormData({ ...initialForm });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'An error occurred';
+      toast({ variant: 'destructive', title: 'Error', description: msg });
     }
-
-    setShowModal(false);
-    setSelectedDepartment(null);
-    setFormData({ ...initialForm });
   };
 
   const resetForm = () => setFormData({ ...initialForm });
@@ -230,8 +229,6 @@ export default function DepartmentsPage() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-200">{error}</div>}
-
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase text-slate-500">Name *</Label>
               <Input name="name" value={formData.name} onChange={handleChange} required placeholder="e.g. Human Resources" className="h-11" />
