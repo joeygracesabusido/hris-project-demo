@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { cache } from '@/lib/redis';
 import { hasAdminAccess } from '@/lib/auth-helpers';
+import { resolveApprovalChain } from '@/lib/approval-chain';
 
 const OVERTIME_CACHE_PREFIX = 'overtime:';
 
@@ -131,10 +132,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
     }
 
+    const h = parseFloat(hours);
+    const chain = await resolveApprovalChain(
+      'OVERTIME',
+      targetEmployeeId,
+      h,
+      date ? new Date(date) : undefined
+    );
+    const initialApproverId = chain.length > 0 ? chain[0].employeeId : targetEmployee?.managerId;
+
     const overtimeRequest = await prisma.overtimeRequest.create({
       data: {
         employeeId: targetEmployeeId,
-        approverId: targetEmployee?.managerId, // Set to manager if exists
+        approverId: initialApproverId,
         date: parsedDate,
         hours: parseFloat(hours),
         reason,

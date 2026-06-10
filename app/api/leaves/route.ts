@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { cache } from '@/lib/redis';
 import { getUserWithEmployee } from '@/lib/user-employee-link';
 import { hasAdminAccess } from '@/lib/auth-helpers';
+import { resolveApprovalChain } from '@/lib/approval-chain';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,10 +114,19 @@ export async function POST(request: Request) {
       select: { managerId: true },
     });
 
+    const days = parseFloat(daysCount);
+    const chain = await resolveApprovalChain(
+      'LEAVE',
+      targetEmployeeId,
+      days,
+      startDate ? new Date(startDate) : undefined
+    );
+    const initialApproverId = chain.length > 0 ? chain[0].employeeId : targetEmployee?.managerId;
+
     const leaveRequest = await prisma.leaveRequest.create({
       data: {
         employeeId: targetEmployeeId,
-        approverId: targetEmployee?.managerId, // Set to manager if exists
+        approverId: initialApproverId,
         leaveType,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
