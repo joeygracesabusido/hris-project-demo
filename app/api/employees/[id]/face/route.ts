@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { cookies } from 'next/headers';
+import { getRequestSession } from '@/lib/auth-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,25 +10,40 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const cookieStore = await cookies();
-    const userRole = cookieStore.get('userRole')?.value;
-    const isLoggedIn = cookieStore.get('isLoggedIn')?.value;
-
-    if (isLoggedIn !== 'true') {
+    let userEmail: string, userRole: string;
+    try {
+      const session = await getRequestSession(request);
+      userEmail = session.userEmail;
+      userRole = session.userRole;
+    } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only ADMIN or HR can enroll faces
-    if (userRole !== 'ADMIN' && userRole !== 'HR') {
-      return NextResponse.json({ error: 'Forbidden – only ADMIN or HR can enroll faces' }, { status: 403 });
-    }
-
-    const employee = await prisma.employee.findUnique({
-      where: { id },
+    // Resolve the employee by id (Employee.id) OR userId (User.id)
+    const employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id },
+          { userId: id },
+        ],
+      },
+      select: { id: true, email: true },
     });
 
     if (!employee) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
+    }
+
+    // Check authorization
+    // ADMIN/HR can enroll any employee's face
+    // EMPLOYEE can only enroll their own face
+    if (userRole === 'EMPLOYEE') {
+      // Employees can only enroll their own face
+      if (employee.email !== userEmail) {
+        return NextResponse.json({ error: 'Forbidden – you can only enroll your own face' }, { status: 403 });
+      }
+    } else if (userRole !== 'ADMIN' && userRole !== 'HR') {
+      return NextResponse.json({ error: 'Forbidden – only ADMIN or HR can enroll faces' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -39,7 +54,7 @@ export async function PUT(
     }
 
     const updatedEmployee = await prisma.employee.update({
-      where: { id },
+      where: { id: employee.id },
       data: {
         faceDescriptor: faceDescriptor,
       },

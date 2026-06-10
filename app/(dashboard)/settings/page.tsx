@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { MapPin, Settings, Save, Trash2, Globe, Edit2, Check, X, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface OfficeLocation {
   id: string;
@@ -23,8 +26,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
   const [mounted, setMounted] = useState(false);
-  
+  const { toast } = useToast();
+
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [newLocation, setNewLocation] = useState({
     name: '',
     latitude: '',
@@ -65,7 +70,7 @@ export default function SettingsPage() {
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      toast({ variant: "destructive", title: "Error", description: "Geolocation is not supported by your browser" });
       return;
     }
 
@@ -80,14 +85,14 @@ export default function SettingsPage() {
       },
       (error) => {
         console.error('Error getting location:', error);
-        alert('Unable to get your current location. Please enter coordinates manually.');
+        toast({ variant: "destructive", title: "Error", description: "Unable to get your current location. Please enter coordinates manually." });
       }
     );
   };
 
   const handleCreateLocation = async () => {
     if (!newLocation.name || !newLocation.latitude || !newLocation.longitude) {
-      alert('Please fill in all fields');
+      toast({ variant: "destructive", title: "Validation Error", description: "Please fill in all fields" });
       return;
     }
 
@@ -104,16 +109,16 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
-        alert('Office location created successfully');
+        toast({ title: "Success", description: "Office location created successfully" });
         setNewLocation({ name: '', latitude: '', longitude: '', radius: '5' });
         fetchLocations();
       } else {
         const error = await res.json();
-        alert(error.error || 'Failed to create location');
+        toast({ variant: 'destructive', title: 'Error', description: error.error || 'Failed to create location' });
       }
     } catch (error) {
       console.error('Error creating location:', error);
-      alert('Failed to create location');
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create location' });
     }
   };
 
@@ -136,16 +141,16 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
-        alert('Location updated successfully');
+        toast({ title: 'Success', description: 'Location updated successfully' });
         setEditingId(null);
         fetchLocations();
       } else {
         const error = await res.json();
-        alert(error.error || 'Failed to update location');
+        toast({ variant: 'destructive', title: 'Error', description: error.error || 'Failed to update location' });
       }
     } catch (error) {
       console.error('Error updating location:', error);
-      alert('Failed to update location');
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update location' });
     }
   };
 
@@ -168,24 +173,30 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteLocation = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this location?')) return;
+  const handleDeleteClick = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDeleteLocation = async () => {
+    if (!deleteConfirmId) return;
 
     try {
-      const res = await fetch(`/api/office-location?id=${id}`, {
+      const res = await fetch(`/api/office-location?id=${deleteConfirmId}`, {
         method: 'DELETE',
       });
 
       if (res.ok) {
-        alert('Location deleted successfully');
+        toast({ title: 'Success', description: 'Location deleted successfully' });
         fetchLocations();
       } else {
         const error = await res.json();
-        alert(error.error || 'Failed to delete location');
+        toast({ variant: 'destructive', title: 'Error', description: error.error || 'Failed to delete location' });
       }
     } catch (error) {
       console.error('Error deleting location:', error);
-      alert('Failed to delete location');
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete location' });
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
 
@@ -201,7 +212,7 @@ export default function SettingsPage() {
 
   const handleUpdateFromEdit = async (id: string) => {
     if (!newLocation.name || !newLocation.latitude || !newLocation.longitude) {
-      alert('Please fill in all fields');
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill in all fields' });
       return;
     }
 
@@ -219,17 +230,17 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
-        alert('Location updated successfully');
+        toast({ title: 'Success', description: 'Location updated successfully' });
         setEditingId(null);
         setNewLocation({ name: '', latitude: '', longitude: '', radius: '5' });
         fetchLocations();
       } else {
         const error = await res.json();
-        alert(error.error || 'Failed to update location');
+        toast({ variant: 'destructive', title: 'Error', description: error.error || 'Failed to update location' });
       }
     } catch (error) {
       console.error('Error updating location:', error);
-      alert('Failed to update location');
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update location' });
     }
   };
 
@@ -441,7 +452,7 @@ export default function SettingsPage() {
                               </Button>
                               <Button
                                 type="button"
-                                onClick={() => handleDeleteLocation(location.id)}
+                                onClick={() => handleDeleteClick(location.id)}
                                 variant="outline"
                                 size="sm"
                                 className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -459,6 +470,18 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        <Dialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Location</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-500">Are you sure you want to delete this location? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteLocation}>Delete</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         </>
       )}
     </div>

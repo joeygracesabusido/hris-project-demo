@@ -1,5 +1,7 @@
 import prisma from '@/lib/prisma'
 import type { Role } from '@prisma/client'
+import { cookies } from 'next/headers'
+import { getEmployeeIdForUser } from '@/lib/user-employee-link'
 
 /**
  * Roles that have full data access (not filtered to personal data)
@@ -46,9 +48,9 @@ export async function getEmployeeIdForFiltering(
     return user.employees[0].id
   }
 
-  // Auto-link by email match if no explicit link exists
+  // Auto-link by email match if no explicit link exists (case-insensitive)
   const matchingEmployee = await prisma.employee.findFirst({
-    where: { email: userEmail },
+    where: { email: { equals: userEmail, mode: 'insensitive' } },
   })
 
   if (matchingEmployee && !matchingEmployee.userId) {
@@ -61,6 +63,28 @@ export async function getEmployeeIdForFiltering(
   }
 
   return null
+}
+
+/**
+ * Extract session info from either cookies (web) or X-Auth headers (Flutter mobile/web).
+ * Returns { userEmail, userRole } or throws 401 if neither source has data.
+ */
+export async function getRequestSession(request: Request) {
+  const cookieStore = await cookies();
+  let userEmail = cookieStore.get('userEmail')?.value;
+  let userRole = cookieStore.get('userRole')?.value;
+
+  // Fallback to X-Auth headers (used by Flutter app)
+  if (!userEmail) {
+    userEmail = request.headers.get('X-Auth-Email') ?? undefined;
+    userRole = request.headers.get('X-Auth-Role') ?? undefined;
+  }
+
+  if (!userEmail) {
+    throw new Error('Unauthorized');
+  }
+
+  return { userEmail, userRole: userRole || 'EMPLOYEE' };
 }
 
 /**
@@ -87,14 +111,23 @@ export async function buildRoleBasedWhereClause(
   }
 
   // Non-admin users only see their own data
-  const linkedEmployeeId = await getEmployeeIdForFiltering(userEmail, userRole)
-  
+  const linkedEmployeeId = await getEmployeeIdForUser(userEmail, userRole)
+
   if (linkedEmployeeId) {
     where.employeeId = linkedEmployeeId
   } else {
-    // EMPLOYEE role with no linked employee sees nothing
-    // Use a valid MongoDB ObjectID that doesn't exist
-    where.employeeId = '000000000000000000000000'
+    // No userId link found — try to find the employee by email directly (case-insensitive)
+    const employeeByEmail = await prisma.employee.findFirst({
+      where: { email: { equals: userEmail, mode: 'insensitive' } },
+      select: { id: true },
+    })
+
+    if (employeeByEmail) {
+      where.employeeId = employeeByEmail.id
+    } else {
+      // Still no match — return empty result set
+      where.employeeId = '000000000000000000000000'
+    }
   }
 
   return where

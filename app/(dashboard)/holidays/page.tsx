@@ -3,12 +3,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Calendar, Plus, Trash2, Edit2, Check, X, AlertCircle, Download } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/hooks/use-toast'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface Holiday {
   id: string
@@ -28,7 +31,10 @@ export default function HolidaysPage() {
   const [filterYear, setFilterYear] = useState<string>('all')
   const [filterType, setFilterType] = useState<string>('all')
 
+  const { toast } = useToast()
+
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [newHoliday, setNewHoliday] = useState({
     name: '',
     date: '',
@@ -73,7 +79,7 @@ export default function HolidaysPage() {
 
   const handleCreateHoliday = async () => {
     if (!newHoliday.name || !newHoliday.date) {
-      alert('Please fill in all fields')
+      toast({ variant: "destructive", title: "Validation Error", description: "Please fill in all fields" })
       return
     }
 
@@ -85,16 +91,16 @@ export default function HolidaysPage() {
       })
 
       if (res.ok) {
-        alert('Holiday created successfully')
+        toast({ title: "Success", description: "Holiday created successfully" })
         setNewHoliday({ name: '', date: '', type: 'REGULAR', isActive: true })
         fetchHolidays()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to create holiday')
+        toast({ variant: "destructive", title: "Error", description: error.error || "Failed to create holiday" })
       }
     } catch (error) {
       console.error('Error creating holiday:', error)
-      alert('Failed to create holiday')
+      toast({ variant: "destructive", title: "Error", description: "Failed to create holiday" })
     }
   }
 
@@ -107,17 +113,17 @@ export default function HolidaysPage() {
       })
 
       if (res.ok) {
-        alert('Holiday updated successfully')
+        toast({ title: "Success", description: "Holiday updated successfully" })
         setEditingId(null)
         setNewHoliday({ name: '', date: '', type: 'REGULAR', isActive: true })
         fetchHolidays()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to update holiday')
+        toast({ variant: "destructive", title: "Error", description: error.error || "Failed to update holiday" })
       }
     } catch (error) {
       console.error('Error updating holiday:', error)
-      alert('Failed to update holiday')
+      toast({ variant: "destructive", title: "Error", description: "Failed to update holiday" })
     }
   }
 
@@ -137,30 +143,34 @@ export default function HolidaysPage() {
     }
   }
 
-  const handleDeleteHoliday = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this holiday?')) return
+  const handleDeleteClick = (id: string) => {
+    setDeleteConfirmId(id)
+  }
+
+  const confirmDeleteHoliday = async () => {
+    if (!deleteConfirmId) return
 
     try {
-      const res = await fetch(`/api/holidays?id=${id}`, {
+      const res = await fetch(`/api/holidays?id=${deleteConfirmId}`, {
         method: 'DELETE',
       })
 
       if (res.ok) {
-        alert('Holiday deleted successfully')
+        toast({ title: "Success", description: "Holiday deleted successfully" })
         fetchHolidays()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to delete holiday')
+        toast({ variant: "destructive", title: "Error", description: error.error || "Failed to delete holiday" })
       }
     } catch (error) {
       console.error('Error deleting holiday:', error)
-      alert('Failed to delete holiday')
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete holiday" })
+    } finally {
+      setDeleteConfirmId(null)
     }
   }
 
   const handleImportHolidays = async () => {
-    if (!confirm('Import official Philippine holidays? Existing holidays will be kept.')) return
-
     try {
       const res = await fetch('/api/holidays/import', {
         method: 'POST',
@@ -170,15 +180,15 @@ export default function HolidaysPage() {
 
       if (res.ok) {
         const data = await res.json()
-        alert(data.message)
+        toast({ title: "Success", description: data.message })
         fetchHolidays()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to import holidays')
+        toast({ variant: "destructive", title: "Error", description: error.error || "Failed to import holidays" })
       }
     } catch (error) {
       console.error('Error importing holidays:', error)
-      alert('Failed to import holidays')
+      toast({ variant: "destructive", title: "Error", description: "Failed to import holidays" })
     }
   }
 
@@ -396,9 +406,9 @@ export default function HolidaysPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getTypeBadgeClass(holiday.type)}`}>
+                              <Badge className={getTypeBadgeClass(holiday.type)}>
                                 {holiday.type === 'REGULAR' ? 'Regular' : holiday.type === 'SPECIAL' ? 'Special' : 'Special Non-Working'}
-                              </span>
+                              </Badge>
                               <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Active:</span>
                                 <Switch
@@ -414,7 +424,7 @@ export default function HolidaysPage() {
                               Edit
                             </Button>
                             <Button
-                              onClick={() => handleDeleteHoliday(holiday.id)}
+                              onClick={() => handleDeleteClick(holiday.id)}
                               variant="outline"
                               size="sm"
                               className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -431,6 +441,18 @@ export default function HolidaysPage() {
               )}
             </CardContent>
           </Card>
+        <Dialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Holiday</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-500">Are you sure you want to delete this holiday? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteHoliday}>Delete</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         </>
       )}
     </div>

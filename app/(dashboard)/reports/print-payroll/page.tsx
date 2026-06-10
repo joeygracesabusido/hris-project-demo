@@ -4,6 +4,14 @@
 import { useState, useEffect } from 'react';
 import { Printer, Calendar, CheckSquare, Square } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 interface PayrollRecord {
   id: string;
@@ -47,6 +55,7 @@ interface Employee {
 }
 
 export default function PrintPayrollPage() {
+  const { toast } = useToast();
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +210,11 @@ export default function PrintPayrollPage() {
     const recordsToPrint = filteredRecords.filter(r => selectedIds.has(r.id));
     
     if (recordsToPrint.length === 0) {
-      alert('Please select at least one record to print');
+      toast({
+        title: 'No records selected',
+        description: 'Please select at least one record to print',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -465,206 +478,197 @@ xPos = 10 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3];
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <p className="text-gray-500">Loading payroll records...</p>
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-muted-foreground">Loading payroll records...</p>
+          </CardContent>
+        </Card>
       ) : (
         <>
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Calendar className="w-5 h-5 text-gray-500" />
-              <h2 className="text-lg font-semibold">Filter by Cut-off Period</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
-                <input
-                  type="date"
-                  value={periodStart}
-                  onChange={(e) => setPeriodStart(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <Calendar className="w-5 h-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">Filter by Cut-off Period</h2>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Period End</label>
-                <input
-                  type="date"
-                  value={periodEnd}
-                  onChange={(e) => setPeriodEnd(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Period Start</Label>
+                  <Input
+                    type="date"
+                    value={periodStart}
+                    onChange={(e) => setPeriodStart(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Period End</Label>
+                  <Input
+                    type="date"
+                    value={periodEnd}
+                    onChange={(e) => setPeriodEnd(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleFilter}>Filter</Button>
+                </div>
               </div>
-              <div className="flex items-end">
-                <button
-                  onClick={() => { handleFilter(); }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Filter
-                </button>
-              </div>
-            </div>
-            {filterApplied && (
-              <p className="text-sm text-gray-500 mt-2">
-                Showing {filteredRecords.length} payroll record(s) 
-                {selectedIds.size > 0 && ` | ${selectedIds.size} selected for printing`}
-              </p>
-            )}
-          </div>
+              {filterApplied && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Showing {filteredRecords.length} payroll record(s) 
+                  {selectedIds.size > 0 && ` | ${selectedIds.size} selected for printing`}
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Signature Block</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prepared By</label>
-                <input
-                  type="text"
-                  value={currentUser?.name || ''}
-                  onChange={(e) => setCurrentUser(prev => prev ? { ...prev, name: e.target.value } : { id: '', name: e.target.value, email: '', role: '' })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your name"
-                />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Signature Block</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Prepared By</Label>
+                  <Input
+                    type="text"
+                    value={currentUser?.name || ''}
+                    onChange={(e) => setCurrentUser(prev => prev ? { ...prev, name: e.target.value } : { id: '', name: e.target.value, email: '', role: '' })}
+                    placeholder="Enter your name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Checked By (Accountant)</Label>
+                  <Select value={selectedAccountant} onValueChange={setSelectedAccountant}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Accountant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accountants.map((acc) => (
+                        <SelectItem key={acc.id} value={acc.fullName}>
+                          {acc.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Approved By (Manager)</Label>
+                  <Select value={selectedManager} onValueChange={setSelectedManager}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Manager" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {managers.map((mgr) => (
+                        <SelectItem key={mgr.id} value={mgr.fullName}>
+                          {mgr.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Checked By (Accountant)</label>
-                <select
-                  value={selectedAccountant}
-                  onChange={(e) => setSelectedAccountant(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Accountant</option>
-                  {accountants.map((acc) => (
-                    <option key={acc.id} value={acc.fullName}>
-                      {acc.fullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Approved By (Manager)</label>
-                <select
-                  value={selectedManager}
-                  onChange={(e) => setSelectedManager(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Manager</option>
-                  {managers.map((mgr) => (
-                    <option key={mgr.id} value={mgr.fullName}>
-                      {mgr.fullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <Card>
             <div className="p-4 border-b flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <h2 className="text-lg font-semibold">Payroll Records</h2>
                 {filteredRecords.length > 0 && (
-                  <button 
-                    onClick={toggleSelectAll}
-                    className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                  >
+                  <Button variant="link" size="sm" onClick={toggleSelectAll}>
                     {selectedIds.size === filteredRecords.length ? 'Deselect All' : 'Select All'}
-                  </button>
+                  </Button>
                 )}
               </div>
-              <button
+              <Button
                 onClick={handlePrintPDF}
                 disabled={selectedIds.size === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 transition-all"
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 mr-2" />
                 {selectedIds.size > 0 
                   ? `Print Selected (${selectedIds.size})` 
                   : 'Print to PDF'}
-              </button>
+              </Button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left w-10">
-                      <button onClick={toggleSelectAll} className="flex items-center justify-center">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleSelectAll}>
                         {selectedIds.size === filteredRecords.length && filteredRecords.length > 0 ? (
                           <CheckSquare className="w-5 h-5 text-blue-600" />
                         ) : (
-                          <Square className="w-5 h-5 text-gray-400" />
+                          <Square className="w-5 h-5 text-muted-foreground" />
                         )}
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Basic Salary</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">OT Pay</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Holiday Pay</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Gross Pay</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Deductions</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Net Pay</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
+                      </Button>
+                    </TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead className="text-right">Basic Salary</TableHead>
+                    <TableHead className="text-right">OT Pay</TableHead>
+                    <TableHead className="text-right">Holiday Pay</TableHead>
+                    <TableHead className="text-right">Gross Pay</TableHead>
+                    <TableHead className="text-right">Deductions</TableHead>
+                    <TableHead className="text-right">Net Pay</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {filteredRecords.map((record) => (
-                    <tr 
+                    <TableRow 
                       key={record.id} 
-                      className={`hover:bg-gray-50 cursor-pointer transition-colors ${selectedIds.has(record.id) ? 'bg-blue-50/50' : ''}`}
+                      className={`cursor-pointer ${selectedIds.has(record.id) ? 'bg-blue-50/50' : ''}`}
                       onClick={() => toggleRecordSelection(record.id)}
                     >
-                      <td className="px-4 py-3">
+                      <TableCell>
                         <div className="flex items-center justify-center">
                           {selectedIds.has(record.id) ? (
                             <CheckSquare className="w-5 h-5 text-blue-600" />
                           ) : (
-                            <Square className="w-5 h-5 text-gray-400" />
+                            <Square className="w-5 h-5 text-muted-foreground" />
                           )}
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{record.employee.fullName}</div>
-                        <div className="text-sm text-gray-500">{record.employee.position}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{record.employee.fullName}</div>
+                        <div className="text-sm text-muted-foreground">{record.employee.position}</div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
                         {new Date(record.periodStart).toLocaleDateString()} -{' '}
                         {new Date(record.periodEnd).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(record.basicSalary)}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(record.otPay || 0)}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(record.holidayPay || 0)}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(record.grossPay)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">{formatCurrency(record.totalDeductions)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-green-600">
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(record.basicSalary)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(record.otPay || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(record.holidayPay || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(record.grossPay)}</TableCell>
+                      <TableCell className="text-right text-red-600">{formatCurrency(record.totalDeductions)}</TableCell>
+                      <TableCell className="text-right font-semibold text-green-600">
                         {formatCurrency(record.netPay)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            record.status === 'PROCESSED'
-                              ? 'bg-green-100 text-green-700'
-                              : record.status === 'APPROVED'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={
+                          record.status === 'PROCESSED' ? 'success' :
+                          record.status === 'APPROVED' ? 'default' : 'secondary'
+                        }>
                           {record.status}
-                        </span>
-                      </td>
-                    </tr>
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
                   ))}
                   {filteredRecords.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                         {filterApplied 
                           ? "No payroll records found for the selected period" 
                           : "Please select a period and click 'Filter' to display payroll data"}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
-          </div>
+          </Card>
         </>
       )}
     </div>

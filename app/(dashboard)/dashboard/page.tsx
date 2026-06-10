@@ -1,55 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, DollarSign, Clock, TrendingUp, UserMinus, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, Clock, TrendingUp, UserMinus, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface Stats {
-  totalEmployees: number;
-  presentToday: number;
-  onLeaveToday: number;
-  absentPerDepartment: {
-    name: string;
-    absent: number;
-    total: number;
-  }[];
-  personalStats?: {
-    isPresent: boolean;
-    isOnLeave: boolean;
-    employeeName: string | undefined;
-    department: string | undefined;
-  };
-}
+import { useDashboardStats } from '@/hooks/use-dashboard';
+import { getClientCookies } from '@/lib/client-cookies';
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading } = useDashboardStats();
   const [userRole, setUserRole] = useState('');
 
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split('=');
-      acc[key] = value;
-      return acc;
-    }, {} as Record<string, string>);
-    setUserRole(cookies.userRole || '');
-    
-    async function fetchStats() {
-      try {
-        const response = await fetch('/api/dashboard/stats', { credentials: 'include' });
-        const data = await response.json();
-        setStats(data);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchStats();
+    const cookies = getClientCookies();
+    setUserRole(cookies.userRole);
   }, []);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -57,7 +23,6 @@ export default function DashboardPage() {
     );
   }
 
-  // EMPLOYEE role view
   if (userRole === 'EMPLOYEE' && stats?.personalStats) {
     const { isPresent, isOnLeave, employeeName, department } = stats.personalStats;
     
@@ -68,7 +33,6 @@ export default function DashboardPage() {
           <p className="text-gray-500">Welcome back, {employeeName}!</p>
         </div>
 
-        {/* Personal Status Card */}
         <Card className="shadow-sm border">
           <CardHeader className="p-6 border-b">
             <CardTitle className="text-lg font-semibold">Today&apos;s Status</CardTitle>
@@ -103,7 +67,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Admin roles view
   const summaryStats = [
     { label: 'Total Employees', value: stats?.totalEmployees.toString() || '0', icon: Users, color: 'bg-blue-500' },
     { label: 'Present Today', value: stats?.presentToday.toString() || '0', icon: Clock, color: 'bg-green-500' },
@@ -118,28 +81,28 @@ export default function DashboardPage() {
         <p className="text-gray-500">Welcome back! Here&apos;s what&apos;s happening today.</p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {summaryStats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="bg-white rounded-xl p-6 shadow-sm border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{stat.label}</p>
-                  <p className="text-2xl font-bold mt-1">{stat.value}</p>
+            <Card key={stat.label}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                  </div>
+                  <div className={`p-3 rounded-lg ${stat.color}`}>
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
                 </div>
-                <div className={`p-3 rounded-lg ${stat.color}`}>
-                  <Icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Absent per Department */}
         <Card className="shadow-sm border">
           <CardHeader className="p-6 border-b">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -175,7 +138,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Legend / Breakdown */}
         <Card className="shadow-sm border">
           <CardHeader className="p-6 border-b">
             <CardTitle className="text-lg font-semibold">Attendance Overview</CardTitle>

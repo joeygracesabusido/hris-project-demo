@@ -101,6 +101,11 @@ export async function POST(request: Request) {
       },
     });
 
+    const linkedEmployee = await prisma.employee.findFirst({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+
     return NextResponse.json({
       message: 'Login successful',
       user: {
@@ -110,15 +115,16 @@ export async function POST(request: Request) {
         name: user.name,
         role: user.role,
         status: user.status,
+        employeeId: linkedEmployee?.id || null,
       },
     }, {
       headers: {
         'Set-Cookie': [
-          `isLoggedIn=true; Path=/; Max-Age=${60 * 60 * 24}`,
-          `userId=${user.id}; Path=/; Max-Age=${60 * 60 * 24}`,
-          `userRole=${user.role}; Path=/; Max-Age=${60 * 60 * 24}`,
-          `userEmail=${user.email}; Path=/; Max-Age=${60 * 60 * 24}`,
-          `userName=${encodeURIComponent(user.name || '')}; Path=/; Max-Age=${60 * 60 * 24}`,
+          `isLoggedIn=true; Path=/; Max-Age=${60 * 60 * 24}; SameSite=Lax; Secure`,
+          `userId=${user.id}; Path=/; Max-Age=${60 * 60 * 24}; SameSite=Lax; Secure`,
+          `userRole=${user.role}; Path=/; Max-Age=${60 * 60 * 24}; SameSite=Lax; Secure`,
+          `userEmail=${user.email}; Path=/; Max-Age=${60 * 60 * 24}; SameSite=Lax; Secure`,
+          `userName=${encodeURIComponent(user.name || '')}; Path=/; Max-Age=${60 * 60 * 24}; SameSite=Lax; Secure`,
         ].join(', '),
       },
     });

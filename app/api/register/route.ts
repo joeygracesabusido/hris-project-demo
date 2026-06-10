@@ -14,24 +14,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const existingEmail = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
+      },
     });
 
-    if (existingEmail) {
+    if (existingUser) {
       return NextResponse.json(
-        { error: 'Email already exists' },
-        { status: 400 }
-      );
-    }
-
-    const existingUsername = await prisma.user.findUnique({
-      where: { username: username.toLowerCase() },
-    });
-
-    if (existingUsername) {
-      return NextResponse.json(
-        { error: 'Username already exists' },
+        { error: 'Username or email already exists' },
         { status: 400 }
       );
     }

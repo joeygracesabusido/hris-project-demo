@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  Clock, MapPin, NavigationOff, CheckCircle2, AlertCircle, Search, Play, Square, Upload, Download, FileSpreadsheet, LogOut, Trash2, User, X
+  Clock, MapPin, NavigationOff, CheckCircle2, AlertCircle, Search, Play, Square, Upload, Download, FileSpreadsheet, LogOut, Trash2, User, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -18,7 +19,18 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import FaceCapture from '@/components/facial-recognition/FaceCapture';
+import { toast } from '@/hooks/use-toast';
+import { useTimeLogs, useDeleteTimeLog } from '@/hooks/use-time-logs';
+import type { TimeLog } from '@/hooks/use-time-logs';
 
 interface Employee {
   id: string;
@@ -29,31 +41,17 @@ interface Employee {
   userId?: string;
 }
 
-interface Shift {
-  id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-}
-
-interface TimeLog {
-  id: string;
-  employeeId: string;
-  date: string;
-  clockIn: string | null;
-  clockOut: string | null;
-  workHours: number;
-  shift: Shift | null;
-  employee: {
-    fullName: string;
-    employeeId: string;
-  };
-}
-
 export default function TimeLogsPage() {
-  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const limit = 20;
+  const { data: paginatedData, isLoading: logsLoading } = useTimeLogs({ page, limit, search: searchTerm });
+  const queryClient = useQueryClient();
+  const deleteMutation = useDeleteTimeLog();
+  const timeLogs = paginatedData?.data ?? [];
+  const totalPages = paginatedData?.totalPages ?? 0;
+  const total = paginatedData?.total ?? 0;
   const [userId, setUserId] = useState('');
   const [userRole, setUserRole] = useState('');
   const [storedDescriptor, setStoredDescriptor] = useState<number[] | undefined>(undefined);
@@ -66,7 +64,6 @@ export default function TimeLogsPage() {
   const [biometricImportOpen, setBiometricImportOpen] = useState(false);
   const [biometricImporting, setBiometricImporting] = useState(false);
   const [biometricImportResult, setBiometricImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const biometricFileInputRef = useRef<HTMLInputElement>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -77,13 +74,14 @@ export default function TimeLogsPage() {
   const [closestLocation, setClosestLocation] = useState<{ name: string; distance: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timeLogToDelete, setTimeLogToDelete] = useState<TimeLog | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [xclsImportOpen, setXclsImportOpen] = useState(false);
   const [xclsImporting, setXclsImporting] = useState(false);
   const [xclsImportResult, setXclsImportResult] = useState<{ success: number; absent: number; failed: number; errors: string[] } | null>(null);
   const xclsFileInputRef = useRef<HTMLInputElement>(null);
   const [showFaceModal, setShowFaceModal] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [faceEnrollStatus, setFaceEnrollStatus] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     const getCookies = () => {
@@ -111,7 +109,6 @@ export default function TimeLogsPage() {
     setUserRole(role || '');
     setUserId(id || '');
     fetchEmployees(role || '', email || '');
-    fetchTimeLogs();
     fetchOfficeLocation();
     getUserLocation();
   }, []);
@@ -137,22 +134,9 @@ useEffect(() => {
     };
   }, [showFaceModal]);
 
-  const fetchTimeLogs = async () => {
-    try {
-      const res = await fetch('/api/time-logs', { credentials: 'include' });
-      if (!res.ok) {
-        console.error('Failed to fetch time logs:', res.statusText);
-        setTimeLogs([]);
-        return;
-      }
-      const data = await res.json() as TimeLog[];
-      setTimeLogs(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Failed to fetch time logs:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   const fetchOfficeLocation = async () => {
     try {
@@ -251,20 +235,34 @@ useEffect(() => {
       const res = await fetch('/api/employees', { credentials: 'include' });
       const data = await res.json() as Employee[];
       
+      // For EMPLOYEE role, filter to only show their own record by email match (case-insensitive)
       if (role === 'EMPLOYEE' && email) {
-        const myEmployee = data.find((emp) => emp.email === email || emp.userId);
+        const lowerEmail = email.toLowerCase();
+        const myEmployee = data.find((emp) => emp.email?.toLowerCase() === lowerEmail);
         if (myEmployee) {
           setEmployeeId(myEmployee.id);
           setEmployees([myEmployee]);
           return;
         }
+        // If no email match, try to find by userId
+        const myEmployeeByUserId = data.find((emp) => emp.userId === userId);
+        if (myEmployeeByUserId) {
+          setEmployeeId(myEmployeeByUserId.id);
+          setEmployees([myEmployeeByUserId]);
+          return;
+        }
+        // No match found - show empty and log error
+        console.error('[Time Logs] EMPLOYEE role but no matching employee found for email:', email, 'Available employees:', data.map(e => e.email));
+        setEmployees([]);
+        return;
       }
       
+      // For admin/manager/HR roles, show all employees and auto-select logged-in user's record
       setEmployees(data);
       
-      // For admin/manager roles, try to auto-select the logged-in user's employee record
       if ((role === 'ADMIN' || role === 'MANAGER' || role === 'HR') && email) {
-        const myEmployee = data.find((emp) => emp.email === email);
+        const lowerEmail = email.toLowerCase();
+        const myEmployee = data.find((emp) => emp.email?.toLowerCase() === lowerEmail);
         if (myEmployee) {
           setEmployeeId(myEmployee.id);
           return;
@@ -281,19 +279,19 @@ useEffect(() => {
 
   const handleClockIn = async () => {
     if (!employeeId) {
-      alert('No employee selected');
+      toast({ title: 'Error', description: 'No employee selected', variant: 'destructive' });
       return;
     }
 
     if (!userLocation && officeLocations.length > 0) {
-      alert('Please enable location services to clock in');
+      toast({ title: 'Location Required', description: 'Please enable location services to clock in', variant: 'destructive' });
       getUserLocation();
       return;
     }
 
     if (officeLocations.length > 0 && !withinRange) {
       const locNames = officeLocations.map(l => l.name).join(', ');
-      alert(`You must be within range of at least one office location to clock in.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`);
+      toast({ title: 'Out of Range', description: `You must be within range of at least one office location to clock in.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`, variant: 'destructive' });
       return;
     }
 
@@ -313,14 +311,14 @@ useEffect(() => {
       const data = await res.json() as { error?: string };
 
       if (!res.ok) {
-        alert(data.error || 'Failed to clock in');
+        toast({ title: 'Error', description: data.error || 'Failed to clock in', variant: 'destructive' });
         return;
       }
 
-      alert('Clock in recorded successfully!');
-      fetchTimeLogs();
+      toast({ title: 'Success', description: 'Clock in recorded successfully!', variant: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['time-logs'] });
     } catch (err) {
-      alert('Something went wrong');
+      toast({ title: 'Error', description: 'Something went wrong', variant: 'destructive' });
     } finally {
       setClockingIn(false);
     }
@@ -328,19 +326,19 @@ useEffect(() => {
 
   const handleClockOut = async () => {
     if (!employeeId) {
-      alert('No employee selected');
+      toast({ title: 'Error', description: 'No employee selected', variant: 'destructive' });
       return;
     }
 
     if (!userLocation && officeLocations.length > 0) {
-      alert('Please enable location services to clock out');
+      toast({ title: 'Location Required', description: 'Please enable location services to clock out', variant: 'destructive' });
       getUserLocation();
       return;
     }
 
     if (officeLocations.length > 0 && !withinRange) {
       const locNames = officeLocations.map(l => l.name).join(', ');
-      alert(`You must be within range of at least one office location to clock out.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`);
+      toast({ title: 'Out of Range', description: `You must be within range of at least one office location to clock out.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`, variant: 'destructive' });
       return;
     }
 
@@ -360,14 +358,14 @@ useEffect(() => {
       const data = await res.json() as { error?: string };
 
       if (!res.ok) {
-        alert(data.error || 'Failed to clock out');
+        toast({ title: 'Error', description: data.error || 'Failed to clock out', variant: 'destructive' });
         return;
       }
 
-      alert('Clock out recorded successfully!');
-      fetchTimeLogs();
+      toast({ title: 'Success', description: 'Clock out recorded successfully!', variant: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['time-logs'] });
     } catch (err) {
-      alert('Something went wrong');
+      toast({ title: 'Error', description: 'Something went wrong', variant: 'destructive' });
     } finally {
       setClockingIn(false);
     }
@@ -443,21 +441,21 @@ useEffect(() => {
       setShowFaceModal(false);
       setIsVerifying(false);
     } else {
-      alert(`Identity verification failed. Match distance: ${distance.toFixed(2)}. Please try again.`);
+      toast({ title: 'Verification Failed', description: `Identity verification failed. Match distance: ${distance.toFixed(2)}. Please try again.`, variant: 'destructive' });
       setIsVerifying(false);
     }
   };
 
   const initiateVerification = async () => {
     if (!employeeId) {
-      alert('No employee selected');
+      toast({ title: 'Error', description: 'No employee selected', variant: 'destructive' });
       return;
     }
 
     setIsVerifying(true);
     try {
       console.log('[Face Verification] Fetching descriptor for employeeId:', employeeId);
-      const res = await fetch(`/api/employees/${employeeId}/face-descriptor`);
+      const res = await fetch(`/api/employees/${employeeId}/face-descriptor`, { credentials: 'include' });
       const responseData = await res.json().catch(() => ({}));
       
       console.log('[Face Verification] Response status:', res.status, responseData);
@@ -483,8 +481,35 @@ useEffect(() => {
     } catch (err: unknown) {
       console.error('[Face Verification] Error:', err);
       const error = err instanceof Error ? err : new Error('Unknown error');
-      alert(error.message);
+      toast({ title: 'Verification Error', description: error.message, variant: 'destructive' });
       setIsVerifying(false);
+    }
+  };
+
+  const handleFaceEnroll = async (descriptor: Float32Array) => {
+    if (!employeeId) return;
+    setFaceEnrollStatus(null);
+
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/face`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ faceDescriptor: Array.from(descriptor) }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setFaceEnrollStatus({ ok: false, msg: data.error || 'Failed to enroll face' });
+        return;
+      }
+
+      setFaceEnrollStatus({ ok: true, msg: '✓ Your face has been enrolled successfully!' });
+      setTimeout(() => { setShowFaceModal(false); setIsEnrolling(false); setFaceEnrollStatus(null); }, 2000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      setFaceEnrollStatus({ ok: false, msg });
     }
   };
 
@@ -552,7 +577,7 @@ useEffect(() => {
       });
 
       if (data.results?.success ?? 0 > 0) {
-        fetchTimeLogs();
+        queryClient.invalidateQueries({ queryKey: ['time-logs'] });
       }
     } catch (err) {
       setImportResult({ success: 0, failed: 1, errors: ['Something went wrong during import'] });
@@ -633,7 +658,7 @@ useEffect(() => {
       });
 
       if ((data.results?.success ?? 0) > 0 || (data.results?.absent ?? 0) > 0) {
-        fetchTimeLogs();
+        queryClient.invalidateQueries({ queryKey: ['time-logs'] });
       }
     } catch (err) {
       setXclsImportResult({ success: 0, absent: 0, failed: 1, errors: ['Something went wrong during import'] });
@@ -675,7 +700,7 @@ useEffect(() => {
       });
 
       if (data.results?.success ?? 0 > 0) {
-        fetchTimeLogs();
+        queryClient.invalidateQueries({ queryKey: ['time-logs'] });
       }
     } catch (err) {
       setBiometricImportResult({ success: 0, failed: 1, errors: ['Something went wrong during import'] });
@@ -702,26 +727,12 @@ useEffect(() => {
   const handleDelete = async () => {
     if (!timeLogToDelete) return;
 
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/time-logs?id=${timeLogToDelete.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        const data = await res.json() as { error?: string };
-        alert(data.error || 'Failed to delete time log');
-        return;
-      }
-
-      fetchTimeLogs();
-      setDeleteDialogOpen(false);
-      setTimeLogToDelete(null);
-    } catch (err) {
-      alert('Something went wrong');
-    } finally {
-      setDeleting(false);
-    }
+    deleteMutation.mutate(timeLogToDelete.id, {
+      onSuccess: () => {
+        setDeleteDialogOpen(false);
+        setTimeLogToDelete(null);
+      },
+    });
   };
 
   return (
@@ -731,6 +742,15 @@ useEffect(() => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Time Logs</h1>
           <p className="text-gray-500 dark:text-gray-400">Record your daily attendance</p>
         </div>
+        {userRole === 'EMPLOYEE' && employeeId && (
+          <Button
+            onClick={() => { setIsEnrolling(true); setFaceEnrollStatus(null); setShowFaceModal(true); }}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <User className="w-4 h-4" />
+            Enroll My Face
+          </Button>
+        )}
         {(userRole === 'ADMIN' || userRole === 'MANAGER') && (
           <div className="flex items-center gap-2">
             <Dialog open={biometricImportOpen} onOpenChange={setBiometricImportOpen}>
@@ -1149,7 +1169,7 @@ useEffect(() => {
                       ? 'Within Clock-In Range' 
                       : 'Outside Clock-In Range'}
                 </p>
-                <p className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600">
                   {!officeLocations.length ? (
                     'No office location configured. Clock-in is allowed from anywhere.'
                   ) : gpsError ? (
@@ -1174,48 +1194,51 @@ useEffect(() => {
                   ) : (
                     'Getting location...'
                   )}
-                </p>
+                </div>
               </div>
               {officeLocations.length > 0 && (
-                <button 
+                <Button 
                   onClick={getUserLocation}
-                  className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                  variant="ghost"
+                  size="icon"
+                  className="p-2 hover:bg-white/50 rounded-lg"
                   title="Refresh location"
                 >
                   <NavigationOff className="w-5 h-5 text-gray-500" />
-                </button>
+                </Button>
               )}
             </div>
           </div>
 
           {/* Employee Selector */}
           <div className="w-full max-w-md">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Employee</label>
-            <select
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-            >
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.fullName} ({emp.employeeId || `#${emp.employeeNumber}`})
-                </option>
-              ))}
-            </select>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Employee</Label>
+            <Select value={employeeId} onValueChange={setEmployeeId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select an employee" />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.fullName} ({emp.employeeId || `#${emp.employeeNumber}`})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex gap-4 w-full max-w-md">
-              <button
+              <Button
                 onClick={() => {
                   if (officeLocations.length > 0) {
                     if (!userLocation) {
-                      alert('Please enable location services to clock in. ' + (gpsError || ''));
+                      toast({ title: 'Location Required', description: 'Please enable location services to clock in. ' + (gpsError || ''), variant: 'destructive' });
                       getUserLocation();
                       return;
                     }
                     if (!withinRange) {
                       const locNames = officeLocations.map(l => l.name).join(', ');
-                      alert(`You must be within range of at least one office location to clock in.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`);
+                      toast({ title: 'Out of Range', description: `You must be within range of at least one office location to clock in.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`, variant: 'destructive' });
                       return;
                     }
                   }
@@ -1230,19 +1253,19 @@ useEffect(() => {
               >
                 <Play className="w-5 h-5" />
                 {clockingIn ? 'Processing...' : 'Clock In'}
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={() => {
                   if (officeLocations.length > 0) {
                     if (!userLocation) {
-                      alert('Please enable location services to clock out. ' + (gpsError || ''));
+                      toast({ title: 'Location Required', description: 'Please enable location services to clock out. ' + (gpsError || ''), variant: 'destructive' });
                       getUserLocation();
                       return;
                     }
                     if (!withinRange) {
                       const locNames = officeLocations.map(l => l.name).join(', ');
-                      alert(`You must be within range of at least one office location to clock out.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`);
+                      toast({ title: 'Out of Range', description: `You must be within range of at least one office location to clock out.\nAvailable locations: ${locNames}\nCurrent distance to closest: ${Math.round(closestLocation?.distance || 0)}m`, variant: 'destructive' });
                       return;
                     }
                   }
@@ -1257,7 +1280,7 @@ useEffect(() => {
               >
                 <Square className="w-5 h-5" />
                 {clockingIn ? 'Processing...' : 'Clock Out'}
-              </button>
+              </Button>
             </div>
 
           {todayLog && employeeId === todayLog.employeeId && (
@@ -1291,153 +1314,229 @@ useEffect(() => {
                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                  <Search className="w-4 h-4" />
                </div>
-               <input
+               <Input
                  type="text"
                  placeholder="Search employee name..."
                  value={searchTerm}
                  onChange={(e) => setSearchTerm(e.target.value)}
-                 className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                 className="pl-10"
                />
              </div>
            </div>
            
-           {loading ? (
-             <div className="p-8 text-center text-gray-500">Loading...</div>
-           ) : timeLogs.filter(log => 
-             log.employee?.fullName?.toLowerCase().includes(searchTerm.toLowerCase())
-           ).length === 0 ? (
-             <div className="p-8 text-center text-gray-500">No time logs found</div>
-           ) : (
-             <div className="overflow-x-auto">
-               <table className="w-full">
-                 <thead className="bg-gray-50 dark:bg-gray-900/50">
-                   <tr>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Employee</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Schedule</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock In</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock Out</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remarks</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                   {timeLogs
-                     .filter(log => 
-                       log.employee?.fullName?.toLowerCase().includes(searchTerm.toLowerCase())
-                     )
-                     .map((log) => {
-                       const remarks = getLatenessRemarks(log);
-                       return (
-                         <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-900 dark:text-gray-200">
-                           <td className="px-6 py-4 text-sm whitespace-nowrap">{formatDate(log.date)}</td>
-                           <td className="px-6 py-4">
-                             <div className="flex items-center gap-2">
-                               <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                                 <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">
-                                   {log.employee?.fullName?.[0] || 'E'}
-                                 </span>
-                               </div>
-                               <div>
-                                 <p className="text-sm font-medium dark:text-gray-200">{log.employee?.fullName || 'Unknown'}</p>
-                                 <p className="text-xs text-gray-500 dark:text-gray-400">{log.employee?.employeeId}</p>
-                               </div>
-                             </div>
-                           </td>
-                           <td className="px-6 py-4 text-sm whitespace-nowrap">
-                             {log.shift ? (
-                               <div className="flex flex-col">
-                                 <span className="font-medium text-blue-600 text-xs">{log.shift.name}</span>
-                                 <span className="text-xs text-gray-500">{log.shift.startTime} - {log.shift.endTime}</span>
-                               </div>
-                             ) : (
-                               <span className="text-gray-400 text-xs italic">No Schedule</span>
-                             )}
-                           </td>
-                           <td className="px-6 py-4 text-sm">{formatTime(log.clockIn)}</td>
-                           <td className="px-6 py-4 text-sm">{formatTime(log.clockOut)}</td>
-                           <td className="px-6 py-4 text-sm">{log.workHours.toFixed(2)}</td>
-                           <td className="px-6 py-4 text-sm whitespace-nowrap">
-                             <Badge variant="outline" className={`${remarks.color} border flex items-center w-fit`}>
-                               {remarks.icon}
-                               {remarks.label}
-                             </Badge>
-                           </td>
-                           <td className="px-6 py-4">
-                             <button
-                               onClick={() => handleDeleteClick(log)}
-                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                               title="Delete time log"
-                             >
-                               <Trash2 className="w-4 h-4" />
-                             </button>
-                           </td>
-                         </tr>
-                       );
-                     })}
-                 </tbody>
-               </table>
-             </div>
+            {logsLoading ? (
+              <div className="p-8 text-center text-gray-500">Loading...</div>
+            ) : timeLogs.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">No time logs found</div>
+             ) : (
+              <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Employee</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Schedule</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock In</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock Out</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remarks</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {timeLogs.map((log) => {
+                      const remarks = getLatenessRemarks(log);
+                      return (
+                        <TableRow key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-900 dark:text-gray-200">
+                          <TableCell className="py-4 text-sm whitespace-nowrap">{formatDate(log.date)}</TableCell>
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                                <span className="text-blue-600 dark:text-blue-400 text-xs font-medium">
+                                  {log.employee?.fullName?.[0] || 'E'}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium dark:text-gray-200">{log.employee?.fullName || 'Unknown'}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{log.employee?.employeeId}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 text-sm whitespace-nowrap">
+                            {log.shift ? (
+                              <div className="flex flex-col">
+                                <span className="font-medium text-blue-600 text-xs">{log.shift.name}</span>
+                                <span className="text-xs text-gray-500">{log.shift.startTime} - {log.shift.endTime}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs italic">No Schedule</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4 text-sm">{formatTime(log.clockIn)}</TableCell>
+                          <TableCell className="py-4 text-sm">{formatTime(log.clockOut)}</TableCell>
+                          <TableCell className="py-4 text-sm">{log.workHours.toFixed(2)}</TableCell>
+                          <TableCell className="py-4 text-sm whitespace-nowrap">
+                            <Badge variant="outline" className={`${remarks.color} border flex items-center w-fit`}>
+                              {remarks.icon}
+                              {remarks.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteClick(log)}
+                              className="text-red-600 hover:bg-red-50 rounded-lg"
+                              title="Delete time log"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+              <div className="flex items-center justify-between px-6 py-3 border-t dark:border-gray-700">
+                <p className="text-sm text-gray-500">
+                  Page {page} of {totalPages} ({total} total)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => Math.abs(p - page) <= 2 || p === 1 || p === totalPages)
+                    .map((p, idx, arr) => (
+                      <span key={p} className="flex items-center">
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span className="px-1 text-gray-400">...</span>
+                        )}
+                        <Button
+                          variant={p === page ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPage(p)}
+                          className="min-w-[32px]"
+                        >
+                          {p}
+                        </Button>
+                      </span>
+                    ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              </>
            )}
          </div>
        )}
 
-       {/* Time Logs Table for Employee (only their own data) */}
-       {userRole === 'EMPLOYEE' && (
-         <div className="bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 overflow-hidden">
-           <div className="p-6 border-b dark:border-gray-700">
-             <h2 className="text-lg font-semibold dark:text-white">My Time Logs</h2>
-           </div>
-           
-           {loading ? (
-             <div className="p-8 text-center text-gray-500">Loading...</div>
-           ) : timeLogs.length === 0 ? (
-             <div className="p-8 text-center text-gray-500">No time logs found</div>
-           ) : (
-             <div className="overflow-x-auto">
-               <table className="w-full">
-                 <thead className="bg-gray-50 dark:bg-gray-900/50">
-                   <tr>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Schedule</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock In</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock Out</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</th>
-                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remarks</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                   {timeLogs.map((log) => {
-                     const remarks = getLatenessRemarks(log);
-                     return (
-                       <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-900 dark:text-gray-200">
-                         <td className="px-6 py-4 text-sm whitespace-nowrap">{formatDate(log.date)}</td>
-                         <td className="px-6 py-4 text-sm whitespace-nowrap">
-                           {log.shift ? (
-                             <div className="flex flex-col">
-                               <span className="font-medium text-blue-600 text-xs">{log.shift.name}</span>
-                               <span className="text-xs text-gray-500">{log.shift.startTime} - {log.shift.endTime}</span>
-                             </div>
-                           ) : (
-                             <span className="text-gray-400 text-xs italic">No Schedule</span>
-                           )}
-                         </td>
-                         <td className="px-6 py-4 text-sm">{formatTime(log.clockIn)}</td>
-                         <td className="px-6 py-4 text-sm">{formatTime(log.clockOut)}</td>
-                         <td className="px-6 py-4 text-sm">{log.workHours.toFixed(2)}</td>
-                         <td className="px-6 py-4 text-sm whitespace-nowrap">
-                           <Badge variant="outline" className={`${remarks.color} border flex items-center w-fit`}>
-                             {remarks.icon}
-                             {remarks.label}
-                           </Badge>
-                         </td>
-                       </tr>
-                     );
-                   })}
-                 </tbody>
-               </table>
-             </div>
+{/* Time Logs Table for Employee (only their own data) */}
+        {userRole === 'EMPLOYEE' && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b dark:border-gray-700">
+              <h2 className="text-lg font-semibold dark:text-white">My Time Logs</h2>
+            </div>
+            
+            {logsLoading ? (
+              <div className="p-8 text-center text-gray-500">Loading...</div>
+            ) : timeLogs.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">No time logs found</div>
+            ) : (
+              <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Schedule</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock In</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Clock Out</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remarks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {timeLogs.map((log) => {
+                   const remarks = getLatenessRemarks(log);
+                   return (
+                     <TableRow key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-900 dark:text-gray-200">
+                       <TableCell className="py-4 text-sm whitespace-nowrap">{formatDate(log.date)}</TableCell>
+                       <TableCell className="py-4 text-sm whitespace-nowrap">
+                         {log.shift ? (
+                           <div className="flex flex-col">
+                             <span className="font-medium text-blue-600 text-xs">{log.shift.name}</span>
+                             <span className="text-xs text-gray-500">{log.shift.startTime} - {log.shift.endTime}</span>
+                           </div>
+                         ) : (
+                           <span className="text-gray-400 text-xs italic">No Schedule</span>
+                         )}
+                       </TableCell>
+                       <TableCell className="py-4 text-sm">{formatTime(log.clockIn)}</TableCell>
+                       <TableCell className="py-4 text-sm">{formatTime(log.clockOut)}</TableCell>
+                       <TableCell className="py-4 text-sm">{log.workHours.toFixed(2)}</TableCell>
+                       <TableCell className="py-4 text-sm whitespace-nowrap">
+                         <Badge variant="outline" className={`${remarks.color} border flex items-center w-fit`}>
+                           {remarks.icon}
+                           {remarks.label}
+                         </Badge>
+                       </TableCell>
+                     </TableRow>
+                   );
+                 })}
+               </TableBody>
+             </Table>
+             <div className="flex items-center justify-between px-6 py-3 border-t dark:border-gray-700">
+                <p className="text-sm text-gray-500">
+                  Page {page} of {totalPages} ({total} total)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => Math.abs(p - page) <= 2 || p === 1 || p === totalPages)
+                    .map((p, idx, arr) => (
+                      <span key={p} className="flex items-center">
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span className="px-1 text-gray-400">...</span>
+                        )}
+                        <Button
+                          variant={p === page ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPage(p)}
+                          className="min-w-[32px]"
+                        >
+                          {p}
+                        </Button>
+                      </span>
+                    ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              </>
            )}
          </div>
        )}
@@ -1467,42 +1566,61 @@ useEffect(() => {
             </Button>
             <Button
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={deleteMutation.isPending}
               className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-semibold shadow-lg shadow-red-500/30"
             >
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
        </Dialog>
 
-       {/* Face Verification Modal */}
-       {showFaceModal && (
-         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-             <div className="p-6 border-b flex justify-between items-center">
-               <div className="flex items-center gap-2">
-                 <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><User className="w-5 h-5" /></div>
-                 <div>
-                   <h2 className="text-xl font-bold text-gray-900">Face Verification</h2>
-                   <p className="text-xs text-gray-500">Please verify your identity to continue</p>
-                 </div>
-               </div>
-               <button 
-                 onClick={() => { setShowFaceModal(false); setIsVerifying(false); }} 
-                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-               >
-                 <X className="w-5 h-5" />
-               </button>
-             </div>
-             <div className="p-6 space-y-4">
-               <FaceCapture 
-                 mode="verify" 
-                 storedDescriptor={storedDescriptor} 
-                 onVerify={handleVerifyFace} 
-               />
-             </div>
-           </div>
+{/* Face Verification/Enrollment Modal */}
+        {showFaceModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+              <div className="p-6 border-b flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${isEnrolling ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {isEnrolling ? 'Face Enrollment' : 'Face Verification'}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      {isEnrolling ? 'Capture your face for attendance verification' : 'Please verify your identity to continue'}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setShowFaceModal(false); setIsVerifying(false); setIsEnrolling(false); setFaceEnrollStatus(null); }} 
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                {faceEnrollStatus && (
+                  <div className={`p-3 rounded-lg border text-sm font-medium ${
+                    faceEnrollStatus.ok
+                      ? 'bg-green-50 border-green-200 text-green-700'
+                      : 'bg-red-50 border-red-200 text-red-700'
+                  }`}>
+                    {faceEnrollStatus.msg}
+                  </div>
+                )}
+                {isEnrolling ? (
+                  <FaceCapture mode="enroll" onCapture={handleFaceEnroll} />
+                ) : (
+                  <FaceCapture 
+                    mode="verify" 
+                    storedDescriptor={storedDescriptor} 
+                    onVerify={handleVerifyFace} 
+                  />
+                )}
+              </div>
+            </div>
          </div>
        )}
      </div>

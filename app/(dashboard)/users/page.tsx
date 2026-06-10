@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Check, X, Clock, UserCheck, UserX, Shield, Briefcase, Users, UserCog } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 type UserRole = 'ADMIN' | 'HR' | 'MANAGER' | 'EMPLOYEE';
 
@@ -98,19 +104,19 @@ export default function UsersPage() {
   };
 
   const getRoleBadge = (role: UserRole) => {
-    const config = {
-      ADMIN: { icon: Shield, color: 'bg-purple-100 text-purple-700' },
-      HR: { icon: UserCog, color: 'bg-pink-100 text-pink-700' },
-      MANAGER: { icon: Briefcase, color: 'bg-blue-100 text-blue-700' },
-      EMPLOYEE: { icon: Users, color: 'bg-gray-100 text-gray-700' },
+    const config: Record<UserRole, { icon: LucideIcon; variant: 'secondary' | 'default'; className: string }> = {
+      ADMIN: { icon: Shield, variant: 'default', className: 'bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200' },
+      HR: { icon: UserCog, variant: 'default', className: 'bg-pink-100 text-pink-700 hover:bg-pink-100 border-pink-200' },
+      MANAGER: { icon: Briefcase, variant: 'default', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200' },
+      EMPLOYEE: { icon: Users, variant: 'secondary', className: '' },
     };
 
-    const { icon: Icon, color } = config[role];
+    const { icon: Icon, className, variant } = config[role];
     return (
-      <span className={`flex items-center gap-1 px-2 py-1 ${color} rounded text-xs`}>
+      <Badge variant={variant} className={`flex items-center gap-1 ${className}`}>
         <Icon className="w-3 h-3" />
         {role}
-      </span>
+      </Badge>
     );
   };
 
@@ -128,13 +134,13 @@ export default function UsersPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'FOR_APPROVAL':
-        return <span className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs"><Clock className="w-3 h-3" /> Pending</span>;
+        return <Badge variant="warning" className="flex items-center gap-1"><Clock className="w-3 h-3" /> Pending</Badge>;
       case 'APPROVED':
-        return <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs"><UserCheck className="w-3 h-3" /> Approved</span>;
+        return <Badge variant="success" className="flex items-center gap-1"><UserCheck className="w-3 h-3" /> Approved</Badge>;
       case 'REJECTED':
-        return <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs"><UserX className="w-3 h-3" /> Rejected</span>;
+        return <Badge variant="destructive" className="flex items-center gap-1"><UserX className="w-3 h-3" /> Rejected</Badge>;
       default:
-        return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">{status}</span>;
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
@@ -149,107 +155,117 @@ export default function UsersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-xl border">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600" />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Pending Approval</p>
+                <p className="text-2xl font-bold">{pendingUsers.length}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Pending Approval</p>
-              <p className="text-2xl font-bold">{pendingUsers.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <UserCheck className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Approved</p>
+                <p className="text-2xl font-bold">{approvedUsers.length}</p>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl border">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <UserCheck className="w-6 h-6 text-green-600" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-100 rounded-lg">
+                <UserX className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Rejected</p>
+                <p className="text-2xl font-bold">{rejectedUsers.length}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Approved</p>
-              <p className="text-2xl font-bold">{approvedUsers.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl border">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <UserX className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Rejected</p>
-              <p className="text-2xl font-bold">{rejectedUsers.length}</p>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b">
-        <button
+        <Button
+          variant={filter === 'all' ? 'default' : 'ghost'}
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`rounded-none border-b-2 ${
             filter === 'all'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-blue-600'
+              : 'border-transparent'
           }`}
         >
           All Users ({users.length})
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={filter === 'FOR_APPROVAL' ? 'default' : 'ghost'}
           onClick={() => setFilter('FOR_APPROVAL')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`rounded-none border-b-2 ${
             filter === 'FOR_APPROVAL'
-              ? 'border-yellow-500 text-yellow-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-yellow-500'
+              : 'border-transparent'
           }`}
         >
           Pending ({pendingUsers.length})
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={filter === 'APPROVED' ? 'default' : 'ghost'}
           onClick={() => setFilter('APPROVED')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`rounded-none border-b-2 ${
             filter === 'APPROVED'
-              ? 'border-green-600 text-green-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-green-600'
+              : 'border-transparent'
           }`}
         >
           Approved ({approvedUsers.length})
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={filter === 'REJECTED' ? 'default' : 'ghost'}
           onClick={() => setFilter('REJECTED')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`rounded-none border-b-2 ${
             filter === 'REJECTED'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
+              ? 'border-red-600'
+              : 'border-transparent'
           }`}
         >
           Rejected ({rejectedUsers.length})
-        </button>
+        </Button>
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-xl border overflow-hidden">
+      <Card>
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <CardContent className="p-8 text-center text-muted-foreground">Loading...</CardContent>
         ) : filteredUsers.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No users found</div>
+          <CardContent className="p-8 text-center text-muted-foreground">No users found</CardContent>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Registered</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
+                <TableRow key={user.id}>
+                  <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-600 font-medium">
@@ -257,83 +273,66 @@ export default function UsersPage() {
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{user.name || 'N/A'}</p>
-                        <p className="text-sm text-gray-500">@{user.username}</p>
+                        <p className="font-medium">{user.name || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">@{user.username}</p>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                  <td className="px-6 py-4">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell>
                     {editingUserId === user.id && canEditRoles ? (
                       <div className="flex items-center gap-2">
-                        <select
-                          value={newRole}
-                          onChange={(e) => setNewRole(e.target.value as UserRole)}
-                          className="px-2 py-1 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="ADMIN">Admin</option>
-                          <option value="HR">HR</option>
-                          <option value="MANAGER">Manager</option>
-                          <option value="EMPLOYEE">Employee</option>
-                        </select>
-                        <button
-                          onClick={() => handleRoleUpdate(user.id)}
-                          className="p-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
-                        >
+                        <Select value={newRole} onValueChange={(value) => setNewRole(value as UserRole)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ADMIN">Admin</SelectItem>
+                            <SelectItem value="HR">HR</SelectItem>
+                            <SelectItem value="MANAGER">Manager</SelectItem>
+                            <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 bg-green-100 text-green-600 hover:bg-green-200" onClick={() => handleRoleUpdate(user.id)}>
                           <Check className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={cancelRoleEdit}
-                          className="p-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-                        >
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 bg-gray-100 text-gray-600 hover:bg-gray-200" onClick={cancelRoleEdit}>
                           <X className="w-3 h-3" />
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         {getRoleBadge(user.role)}
                         {canEditRoles && (
-                          <button
-                            onClick={() => startEditingRole(user)}
-                            className="p-1 hover:bg-gray-100 rounded"
-                            title="Edit role"
-                          >
-                            <UserCog className="w-3 h-3 text-gray-400" />
-                          </button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditingRole(user)} title="Edit role">
+                            <UserCog className="w-3 h-3 text-muted-foreground" />
+                          </Button>
                         )}
                       </div>
                     )}
-                  </td>
-                  <td className="px-6 py-4">{getStatusBadge(user.status)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  </TableCell>
+                  <TableCell>{getStatusBadge(user.status)}</TableCell>
+                  <TableCell className="text-muted-foreground">
                     {new Date(user.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">
+                  </TableCell>
+                  <TableCell>
                     {userRole === 'ADMIN' && user.status === 'FOR_APPROVAL' && (
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleStatusChange(user.id, 'APPROVED')}
-                          className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
-                          title="Approve"
-                        >
+                        <Button variant="ghost" size="icon" className="bg-green-100 text-green-600 hover:bg-green-200" onClick={() => handleStatusChange(user.id, 'APPROVED')} title="Approve">
                           <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(user.id, 'REJECTED')}
-                          className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                          title="Reject"
-                        >
+                        </Button>
+                        <Button variant="ghost" size="icon" className="bg-red-100 text-red-600 hover:bg-red-200" onClick={() => handleStatusChange(user.id, 'REJECTED')} title="Reject">
                           <X className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { startOfDay, endOfDay } from 'date-fns';
-import { cookies } from 'next/headers';
-import { buildRoleBasedWhereClause } from '@/lib/auth-helpers';
+import { buildRoleBasedWhereClause, getRequestSession } from '@/lib/auth-helpers';
+import { computeLateMinutes, computeUndertimeMinutes, parseTimeString } from '@/lib/late-computation';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,24 +95,56 @@ async function validateGPS(latitude: number, longitude: number) {
 
 export async function GET(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const userRole = cookieStore.get('userRole')?.value;
-    const userEmail = cookieStore.get('userEmail')?.value;
-
-    if (!userEmail) {
+    let userEmail: string, userRole: string;
+    try {
+      const session = await getRequestSession(request);
+      userEmail = session.userEmail;
+      userRole = session.userRole;
+    } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const employeeIdParam = searchParams.get('employeeId');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+    const search = searchParams.get('search') || '';
 
     // Build role-based where clause
-    const where = await buildRoleBasedWhereClause(userEmail, userRole || '', employeeIdParam ?? undefined);
+    const baseWhere = await buildRoleBasedWhereClause(userEmail, userRole, employeeIdParam ?? undefined);
 
-    const timeLogs = await prisma.timeLog.findMany({
-      where,
-      orderBy: { date: 'desc' },
-    });
+    // If search term provided, find matching employee IDs
+    if (search) {
+      const matchingEmployees = await prisma.employee.findMany({
+        where: {
+          fullName: { contains: search, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      const searchEmployeeIds = matchingEmployees.map(e => e.id);
+
+      // If baseWhere has a specific employeeId (EMPLOYEE role), intersect with search
+      if (baseWhere.employeeId && typeof baseWhere.employeeId === 'string') {
+        if (!searchEmployeeIds.includes(baseWhere.employeeId)) {
+          searchEmployeeIds.push('000000000000000000000000'); // force empty
+        }
+        baseWhere.employeeId = { in: searchEmployeeIds };
+      } else {
+        baseWhere.employeeId = { in: searchEmployeeIds };
+      }
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [timeLogs, total] = await Promise.all([
+      prisma.timeLog.findMany({
+        where: baseWhere,
+        orderBy: { date: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.timeLog.count({ where: baseWhere }),
+    ]);
 
     const employeeIds = Array.from(new Set(timeLogs.map(log => log.employeeId)));
     const employees = await prisma.employee.findMany({
@@ -158,7 +190,13 @@ export async function GET(request: Request) {
       };
     }));
 
-    return NextResponse.json(formattedLogs);
+    return NextResponse.json({
+      data: formattedLogs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error('Error fetching time logs:', error);
     return NextResponse.json(
@@ -234,21 +272,20 @@ export async function POST(request: Request) {
       });
 
       if (schedule?.shift && !schedule.shift.isOff && schedule.shift.startTime !== '-') {
-        const [sHour, sMin] = schedule.shift.startTime.split(':').map(Number);
-        const scheduledTime = new Date(now.getTime());
-        scheduledTime.setHours(sHour, sMin, 0, 0);
-        
-        const diffMs = now.getTime() - scheduledTime.getTime();
-        if (diffMs > 60000) { // More than 1 minute late
-          lateMinutes = Math.floor(diffMs / 60000);
+        const timeParts = parseTimeString(schedule.shift.startTime);
+        if (timeParts) {
+          const [sHour, sMin] = timeParts;
+          const gracePeriod = schedule.shift.gracePeriodMinutes ?? 0;
+          // now is Manila-adjusted; use setUTCHours to set the time components consistently
+          lateMinutes = computeLateMinutes(now, sHour, sMin, gracePeriod);
         }
       }
 
       if (existingLog) {
         await prisma.timeLog.update({
           where: { id: existingLog.id },
-          data: { 
-            clockIn: now, 
+          data: {
+            clockIn: now,
             lateMinutes,
             clockInLatitude: latitude,
             clockInLongitude: longitude,
@@ -280,11 +317,30 @@ export async function POST(request: Request) {
       const clockInTime = new Date(existingLog.clockIn!);
       const hoursWorked = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
 
+      // Calculate undertime if a shift is assigned
+      let undertimeMinutes = 0;
+      const schedule = await prisma.shiftSchedule.findFirst({
+        where: {
+          employeeId,
+          date: { gte: todayStart, lte: todayEnd },
+        },
+        include: { shift: true }
+      });
+
+      if (schedule?.shift && !schedule.shift.isOff && schedule.shift.endTime !== '-') {
+        const timeParts = parseTimeString(schedule.shift.endTime);
+        if (timeParts) {
+          const [eHour, eMin] = timeParts;
+          undertimeMinutes = computeUndertimeMinutes(now, eHour, eMin);
+        }
+      }
+
       await prisma.timeLog.update({
         where: { id: existingLog.id },
         data: {
           clockOut: now,
           workHours: Math.round(hoursWorked * 100) / 100,
+          undertimeMinutes,
           clockOutLatitude: latitude,
           clockOutLongitude: longitude,
         },
@@ -302,10 +358,15 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const userRole = cookieStore.get('userRole')?.value;
+    let _userRole: string;
+    try {
+      const session = await getRequestSession(request);
+      _userRole = session.userRole;
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (userRole !== 'ADMIN' && userRole !== 'MANAGER') {
+    if (_userRole !== 'ADMIN' && _userRole !== 'MANAGER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

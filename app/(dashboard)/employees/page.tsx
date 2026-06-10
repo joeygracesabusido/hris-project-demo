@@ -1,36 +1,38 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, User, Mail, Briefcase, Building, DollarSign, Calendar, CreditCard, Pencil, Trash2, X, Wallet } from 'lucide-react';
+import { Plus, Search, User, Pencil, Trash2, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import FaceCapture from '@/components/facial-recognition/FaceCapture';
-
-interface Employee {
-  id: string;
-  employeeNumber: number;
-  fullName: string;
-  email: string;
-  employeeId: string;
-  position: string;
-  department: string;
-  payType: string;
-  basicSalary: number;
-  dailyRate: number;
-  payrollFrequency: string;
-  hireDate: string;
-  isActive: boolean;
-  employeeStatus: string;
-  regularizationDate?: string;
-  managerId?: string;
-  tin: string;
-  sssNo: string;
-  philhealthNo: string;
-  pagibigNo: string;
-  bankName: string;
-  bankAccountNo: string;
-}
+import { useEmployees, useCreateEmployee, useUpdateEmployee, useDeleteEmployee, useEnrollFace } from '@/hooks/use-employees';
+import { getClientCookies } from '@/lib/client-cookies';
+import type { Employee } from '@/hooks/use-employees';
 
 const departments = ['IT', 'HR', 'Finance', 'Marketing', 'Operations', 'Sales', 'Engineering', 'Admin'];
 const frequencies = [
@@ -39,9 +41,23 @@ const frequencies = [
   { value: 'MONTHLY', label: 'Monthly' }
 ];
 
+const initialForm = {
+  employeeId: '', fullName: '', email: '', position: '', department: '',
+  payType: 'MONTHLY', basicSalary: '', dailyRate: '',
+  payrollFrequency: 'MONTHLY', managerId: '', hireDate: '',
+  tin: '', sssNo: '', philhealthNo: '', pagibigNo: '',
+  bankName: '', bankAccountNo: '',
+  employeeStatus: 'PROBATIONARY', regularizationDate: '',
+};
+
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: employees = [], isLoading } = useEmployees();
+  const createEmployee = useCreateEmployee();
+  const updateEmployee = useUpdateEmployee();
+  const deleteEmployee = useDeleteEmployee();
+  const enrollFace = useEnrollFace();
+  const { toast } = useToast();
+
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -49,68 +65,19 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [userRole, setUserRole] = useState<string>('');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [faceEnrollStatus, setFaceEnrollStatus] = useState<{ ok: boolean; msg: string } | null>(null);
-  
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    fullName: '',
-    email: '',
-    position: '',
-    department: '',
-    payType: 'MONTHLY',
-    basicSalary: '',
-    dailyRate: '',
-    payrollFrequency: 'MONTHLY',
-    managerId: '',
-    hireDate: '',
-    tin: '',
-    sssNo: '',
-    philhealthNo: '',
-    pagibigNo: '',
-    bankName: '',
-    bankAccountNo: '',
-    employeeStatus: 'PROBATIONARY',
-    regularizationDate: '',
-  });
+  const [formData, setFormData] = useState({ ...initialForm });
 
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const getCookies = () => {
-      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
-      return { role: cookies.userRole || '', loggedIn: cookies.isLoggedIn === 'true' };
-    };
-    
-    const { role, loggedIn } = getCookies();
-    if (!loggedIn) {
+    const cookies = getClientCookies();
+    if (!cookies.isLoggedIn) {
       window.location.href = '/login';
       return;
     }
-    setUserRole(role);
-    fetchEmployees();
+    setUserRole(cookies.userRole);
+    setCurrentUserEmail(cookies.userEmail);
   }, []);
-
-  const fetchEmployees = async () => {
-    try {
-      const res = await fetch('/api/employees', { credentials: 'include' });
-      const data = await res.json();
-      console.log('API Response status:', res.status);
-      console.log('API Response data type:', typeof data, Array.isArray(data));
-      console.log('API Response data:', data);
-      if (Array.isArray(data)) {
-        setEmployees(data);
-      } else {
-        console.error('API returned error:', data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch employees:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -120,49 +87,35 @@ export default function EmployeesPage() {
     e.preventDefault();
     setError('');
 
-    try {
-      const payload = {
-        ...(selectedEmployee ? { id: selectedEmployee.id } : {}),
-        ...formData,
-        basicSalary: parseFloat(formData.basicSalary || '0'),
-        dailyRate: parseFloat(formData.dailyRate || '0'),
-        managerId: formData.managerId || null
-      };
+    const payload = {
+      ...(selectedEmployee ? { id: selectedEmployee.id } : {}),
+      ...formData,
+      basicSalary: parseFloat(formData.basicSalary || '0'),
+      dailyRate: parseFloat(formData.dailyRate || '0'),
+      managerId: formData.managerId || null
+    };
 
-      const res = await fetch('/api/employees', {
-        method: selectedEmployee ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to save employee');
-        return;
-      }
-
-      setShowModal(false);
-      setSelectedEmployee(null);
-      resetForm();
-      fetchEmployees();
-    } catch (err) {
-      setError('Something went wrong');
+    if (selectedEmployee) {
+      const result = await updateEmployee.mutateAsync(payload);
+      if (result?.error) { setError(result.error); return; }
+    } else {
+      const result = await createEmployee.mutateAsync(payload);
+      if (result?.error) { setError(result.error); return; }
     }
+
+    setShowModal(false);
+    setSelectedEmployee(null);
+    setFormData({ ...initialForm });
   };
 
-  const resetForm = () => {
-    setFormData({
-      employeeId: '', fullName: '', email: '', position: '', department: '',
-      payType: 'MONTHLY', basicSalary: '', dailyRate: '',
-      payrollFrequency: 'MONTHLY', managerId: '', hireDate: '',
-      tin: '', sssNo: '', philhealthNo: '', pagibigNo: '',
-      bankName: '', bankAccountNo: '',
-      employeeStatus: 'PROBATIONARY', regularizationDate: '',
-    });
-  };
+  const resetForm = () => setFormData({ ...initialForm });
 
   const handleEdit = (employee: Employee) => {
+    if (userRole === 'EMPLOYEE') {
+      setSelectedEmployee(employee);
+      setShowFaceModal(true);
+      return;
+    }
     setSelectedEmployee(employee);
     setFormData({
       employeeId: employee.employeeId,
@@ -190,16 +143,9 @@ export default function EmployeesPage() {
 
   const handleDelete = async () => {
     if (!selectedEmployee) return;
-    try {
-      const res = await fetch(`/api/employees?id=${selectedEmployee.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setShowDeleteModal(false);
-        setSelectedEmployee(null);
-        fetchEmployees();
-      }
-    } catch (err) {
-      alert('Something went wrong');
-    }
+    await deleteEmployee.mutateAsync(selectedEmployee.id);
+    setShowDeleteModal(false);
+    setSelectedEmployee(null);
   };
 
   const handleFaceCapture = async (descriptor: Float32Array) => {
@@ -207,22 +153,11 @@ export default function EmployeesPage() {
     setFaceEnrollStatus(null);
 
     try {
-      const res = await fetch(`/api/employees/${selectedEmployee.id}/face`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ faceDescriptor: Array.from(descriptor) }),
+      await enrollFace.mutateAsync({
+        employeeId: selectedEmployee.id,
+        descriptor: Array.from(descriptor),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setFaceEnrollStatus({ ok: false, msg: data.error || 'Failed to enroll face' });
-        return;
-      }
-
       setFaceEnrollStatus({ ok: true, msg: `✓ Face enrolled for ${selectedEmployee.fullName}!` });
-      // Close modal after a short delay so the user sees the success message
       setTimeout(() => setShowFaceModal(false), 1800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
@@ -245,31 +180,28 @@ export default function EmployeesPage() {
           <p className="text-gray-500">Manage employee records and payroll rates</p>
         </div>
         {isAdmin && (
-          <button onClick={() => { setSelectedEmployee(null); resetForm(); setShowModal(true); }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+          <Button onClick={() => { setSelectedEmployee(null); resetForm(); setShowModal(true); }}>
             <Plus className="w-5 h-5" /> Add Employee
-          </button>
+          </Button>
         )}
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        <Input type="text" placeholder="Search employees..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10" />
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-xl border shadow-sm p-12 text-center text-gray-500 flex flex-col items-center gap-2">
+      {isLoading ? (
+        <Card className="shadow-sm"><CardContent className="p-12 text-center text-gray-500 flex flex-col items-center gap-2">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           Loading employees...
-        </div>
+        </CardContent></Card>
       ) : (
         <>
-          {/* ── Mobile card layout ── */}
           <div className="lg:hidden space-y-3">
             {filteredEmployees.map((employee) => (
-              <div key={employee.id} className="bg-white rounded-xl border shadow-sm p-4 space-y-3">
-                {/* Header row: avatar + name + actions */}
+              <Card key={employee.id} className="shadow-sm"><CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 shrink-0 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
@@ -282,13 +214,17 @@ export default function EmployeesPage() {
                   </div>
                   {isAdmin && (
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => handleEdit(employee)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => { setSelectedEmployee(employee); setShowDeleteModal(true); }} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(employee)} className="text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setSelectedEmployee(employee); setShowDeleteModal(true); }} className="text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
                     </div>
+                  )}
+                  {userRole === 'EMPLOYEE' && (
+                    <Button variant="ghost" size="icon" onClick={() => { setSelectedEmployee(employee); setShowFaceModal(true); }} className="text-green-600 hover:bg-green-50" title="Enroll Face">
+                      <User className="w-4 h-4" />
+                    </Button>
                   )}
                 </div>
 
-                {/* Info grid */}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Department</p>
@@ -296,11 +232,9 @@ export default function EmployeesPage() {
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Pay Type</p>
-                    <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${
-                      employee.payType === 'DAILY' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-blue-50 text-blue-700 border border-blue-100'
-                    }`}>
+                    <Badge variant={employee.payType === 'DAILY' ? 'warning' : 'default'} className="mt-0.5">
                       {employee.payType || 'MONTHLY'}
-                    </span>
+                    </Badge>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">
@@ -315,47 +249,45 @@ export default function EmployeesPage() {
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Status</p>
                     <div className="flex flex-wrap gap-1 mt-0.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                        employee.employeeStatus === 'REGULAR' ? 'bg-blue-100 text-blue-700' :
-                        employee.employeeStatus === 'PROBATIONARY' ? 'bg-amber-100 text-amber-700' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
+                      <Badge variant={
+                        employee.employeeStatus === 'REGULAR' ? 'success' :
+                        employee.employeeStatus === 'PROBATIONARY' ? 'warning' :
+                        'secondary'
+                      }>
                         {employee.employeeStatus || 'PROBATIONARY'}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                        employee.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                      }`}>
+                      </Badge>
+                      <Badge variant={employee.isActive ? 'success' : 'secondary'}>
                         {employee.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                 </div>
-              </div>
+              </CardContent></Card>
             ))}
             {filteredEmployees.length === 0 && (
-              <div className="bg-white rounded-xl border shadow-sm p-8 text-center text-gray-400 text-sm">
+              <Card className="shadow-sm"><CardContent className="p-8 text-center text-gray-400 text-sm">
                 No employees found.
-              </div>
+              </CardContent></Card>
             )}
           </div>
 
-          {/* ── Desktop table layout ── */}
           <div className="hidden lg:block bg-white rounded-xl border overflow-hidden shadow-sm">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Employee</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pay Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Rate/Salary</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Department</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  {isAdmin && <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Employee</TableHead>
+                  <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Pay Type</TableHead>
+                  <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Rate/Salary</TableHead>
+                  <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Department</TableHead>
+                  <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Status</TableHead>
+                  {isAdmin && <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</TableHead>}
+                  {userRole === 'EMPLOYEE' && <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Face</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredEmployees.map((employee) => (
-                  <tr key={employee.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
+                  <TableRow key={employee.id}>
+                    <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold">
                           {employee.fullName[0].toUpperCase()}
@@ -365,15 +297,13 @@ export default function EmployeesPage() {
                           <p className="text-xs text-gray-500">ID: {employee.employeeId}</p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${
-                        employee.payType === 'DAILY' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-blue-50 text-blue-700 border border-blue-100'
-                      }`}>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={employee.payType === 'DAILY' ? 'warning' : 'default'}>
                         {employee.payType || 'MONTHLY'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex flex-col">
                         <span className="font-bold text-gray-900">
                           ₱{employee.payType === 'DAILY' 
@@ -384,89 +314,110 @@ export default function EmployeesPage() {
                           {employee.payType === 'DAILY' ? 'per day' : 'per month'}
                         </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-600">{employee.department}</td>
-                    <td className="px-6 py-4">
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-gray-600">{employee.department}</TableCell>
+                    <TableCell>
                       <div className="flex flex-col gap-1">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
-                          employee.employeeStatus === 'REGULAR' ? 'bg-blue-100 text-blue-700' :
-                          employee.employeeStatus === 'PROBATIONARY' ? 'bg-amber-100 text-amber-700' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
+                        <Badge variant={
+                          employee.employeeStatus === 'REGULAR' ? 'success' :
+                          employee.employeeStatus === 'PROBATIONARY' ? 'warning' :
+                          'secondary'
+                        }>
                           {employee.employeeStatus || 'PROBATIONARY'}
-                        </span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium w-fit ${
-                          employee.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
+                        </Badge>
+                        <Badge variant={employee.isActive ? 'success' : 'secondary'}>
                           {employee.isActive ? 'Active' : 'Inactive'}
-                        </span>
+                        </Badge>
                       </div>
-                    </td>
+                    </TableCell>
                     {isAdmin && (
-                      <td className="px-6 py-4">
+                      <TableCell>
                         <div className="flex gap-2">
-                          <button onClick={() => handleEdit(employee)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                          <button onClick={() => { setSelectedEmployee(employee); setShowDeleteModal(true); }} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(employee)} className="text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => { setSelectedEmployee(employee); setShowDeleteModal(true); }} className="text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
                         </div>
-                      </td>
+                      </TableCell>
                     )}
-                  </tr>
+                    {userRole === 'EMPLOYEE' && (
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => { setSelectedEmployee(employee); setShowFaceModal(true); }} className="text-green-600 hover:bg-green-50" title="Enroll Face">
+                          <User className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </>
       )}
 
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-950 text-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-800">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-950 z-10">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-900/30 rounded-lg text-blue-400"><User className="w-5 h-5" /></div>
-                <h2 className="text-xl font-bold text-white">{selectedEmployee ? 'Edit Employee Profile' : 'Register New Employee'}</h2>
-              </div>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+      <Dialog open={showModal} onOpenChange={(open) => { if (!open) setShowModal(false); }}>
+        <DialogContent className="bg-slate-950 text-white sm:max-w-3xl max-h-[90vh] overflow-y-auto border-slate-800 p-0 gap-0">
+          <DialogHeader className="p-6 border-b border-slate-800 sticky top-0 bg-slate-950 z-10">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-900/30 rounded-lg text-blue-400"><User className="w-5 h-5" /></div>
+              <DialogTitle className="text-white text-xl font-bold">{selectedEmployee ? 'Edit Employee Profile' : 'Register New Employee'}</DialogTitle>
             </div>
+          </DialogHeader>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-8">
               {error && <div className="bg-red-900/20 text-red-400 p-4 rounded-xl text-sm font-medium border border-red-900/50">{error}</div>}
+              {userRole === 'EMPLOYEE' && <div className="bg-green-900/20 text-green-400 p-4 rounded-xl text-sm font-medium border border-green-900/50">View mode - Only Face Enrollment is enabled</div>}
 
               <section>
                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Personal & Role Info</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Full Name *</Label>
-                    <Input name="fullName" value={formData.fullName} onChange={handleChange} required placeholder="Juan R. Dela Cruz" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
+                    <Input name="fullName" value={formData.fullName} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="Juan R. Dela Cruz" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Employee ID *</Label>
-                    <Input name="employeeId" value={formData.employeeId} onChange={handleChange} required placeholder="EMP-0001" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
+                    <Input name="employeeId" value={formData.employeeId} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="EMP-0001" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Work Email *</Label>
-                    <Input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="juan@company.com" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
+                    <Input type="email" name="email" value={formData.email} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="juan@company.com" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Position *</Label>
-                    <Input name="position" value={formData.position} onChange={handleChange} required placeholder="Senior Developer" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
+                    <Input name="position" value={formData.position} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="Senior Developer" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Department *</Label>
-                    <select name="department" value={formData.department} onChange={handleChange} required className="w-full h-11 px-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-900 border-slate-700 text-white">
-                      <option value="">Select Department</option>
-                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
+                    <Select
+                      value={formData.department}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
+                      disabled={userRole === 'EMPLOYEE'}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
+                        <SelectValue placeholder="Select Department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Employment Status</Label>
-                    <select name="employeeStatus" value={formData.employeeStatus} onChange={handleChange} className="w-full h-11 px-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-900 border-slate-700 text-white">
-                      <option value="PROBATIONARY">Probationary</option>
-                      <option value="REGULAR">Regular</option>
-                      <option value="RESIGNED">Resigned</option>
-                      <option value="TERMINATED">Terminated</option>
-                      <option value="ONDESIGN">On Designation</option>
-                    </select>
+                    <Select
+                      value={formData.employeeStatus}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, employeeStatus: value }))}
+                      disabled={userRole === 'EMPLOYEE'}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PROBATIONARY">Probationary</SelectItem>
+                        <SelectItem value="REGULAR">Regular</SelectItem>
+                        <SelectItem value="RESIGNED">Resigned</SelectItem>
+                        <SelectItem value="TERMINATED">Terminated</SelectItem>
+                        <SelectItem value="ONDESIGN">On Designation</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Regularization Date</Label>
@@ -483,10 +434,18 @@ export default function EmployeesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-gray-500">Payment Type *</Label>
-                    <select name="payType" value={formData.payType} onChange={handleChange} required className="w-full h-11 px-3 border rounded-lg bg-white focus:ring-2 focus:ring-blue-500 font-bold">
-                      <option value="MONTHLY">Fixed Monthly Salary</option>
-                      <option value="DAILY">Daily Rate Basis</option>
-                    </select>
+                    <Select
+                      value={formData.payType}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, payType: value }))}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-white border rounded-lg font-bold">
+                        <SelectValue placeholder="Select pay type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MONTHLY">Fixed Monthly Salary</SelectItem>
+                        <SelectItem value="DAILY">Daily Rate Basis</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {formData.payType === 'DAILY' ? (
@@ -510,9 +469,17 @@ export default function EmployeesPage() {
 
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Payroll Frequency *</Label>
-                    <select name="payrollFrequency" value={formData.payrollFrequency} onChange={handleChange} required className="w-full h-11 px-3 border rounded-lg bg-slate-900 border-slate-700 text-white">
-                      {frequencies.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                    </select>
+                    <Select
+                      value={formData.payrollFrequency}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, payrollFrequency: value }))}
+                    >
+                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white">
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {frequencies.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-bold uppercase text-slate-400">Hire Date *</Label>
@@ -579,57 +546,64 @@ export default function EmployeesPage() {
 
               <div className="flex gap-4 pt-4 sticky bottom-0 bg-slate-950 py-4 border-t border-slate-800">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1 h-12 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">Cancel</Button>
-                <Button type="submit" className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white">{selectedEmployee ? 'Update Profile' : 'Create Employee'}</Button>
+                {userRole !== 'EMPLOYEE' && (
+                  <Button type="submit" className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white" disabled={createEmployee.isPending || updateEmployee.isPending}>
+                    {createEmployee.isPending || updateEmployee.isPending ? 'Saving...' : selectedEmployee ? 'Update Profile' : 'Create Employee'}
+                  </Button>
+                )}
+                {userRole === 'EMPLOYEE' && (
+                  <Button type="button" onClick={() => { setShowModal(false); setShowFaceModal(true); }} className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white">Enroll Face</Button>
+                )}
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
-            <div className="text-center">
+      <Dialog open={showDeleteModal} onOpenChange={(open) => { if (!open) setShowDeleteModal(false); }}>
+        <DialogContent className="sm:max-w-md p-0 gap-0">
+          <DialogHeader className="p-8 pb-0">
+            <DialogTitle className="text-center">
               <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6"><Trash2 className="w-10 h-10" /></div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Delete Profile?</h2>
-              <p className="text-gray-500 mb-8 text-sm leading-relaxed">This will permanently remove <strong>{selectedEmployee?.fullName}</strong> from the system. This action cannot be reversed.</p>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setShowDeleteModal(false)} className="flex-1 h-11">No, Keep it</Button>
-                <Button onClick={handleDelete} className="flex-1 h-11 bg-red-600 hover:bg-red-700">Yes, Delete</Button>
-              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-8 pt-4">
+            <p className="text-gray-500 mb-8 text-sm leading-relaxed text-center">This will permanently remove <strong>{selectedEmployee?.fullName}</strong> from the system. This action cannot be reversed.</p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setShowDeleteModal(false)} className="flex-1 h-11">No, Keep it</Button>
+              <Button onClick={handleDelete} className="flex-1 h-11 bg-red-600 hover:bg-red-700" disabled={deleteEmployee.isPending}>
+                {deleteEmployee.isPending ? 'Deleting...' : 'Yes, Delete'}
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {showFaceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><User className="w-5 h-5" /></div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Face Enrollment</h2>
-                  {selectedEmployee && <p className="text-xs text-gray-500">{selectedEmployee.fullName}</p>}
-                </div>
+      <Dialog open={showFaceModal} onOpenChange={(open) => { if (!open) { setShowFaceModal(false); setFaceEnrollStatus(null); } }}>
+        <DialogContent className="sm:max-w-lg p-0 gap-0">
+          <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><User className="w-5 h-5" /></div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-gray-900">Face Enrollment</DialogTitle>
+                {selectedEmployee && <p className="text-xs text-gray-500">{selectedEmployee.fullName}</p>}
               </div>
-              <button onClick={() => { setShowFaceModal(false); setFaceEnrollStatus(null); }} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-6 space-y-4">
-              {faceEnrollStatus && (
-                <div className={`p-3 rounded-lg border text-sm font-medium ${
-                  faceEnrollStatus.ok
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-red-50 border-red-200 text-red-700'
-                }`}>
-                  {faceEnrollStatus.msg}
-                </div>
-              )}
-              <FaceCapture mode="enroll" onCapture={handleFaceCapture} />
-            </div>
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+            {faceEnrollStatus && (
+              <div className={`p-3 rounded-lg border text-sm font-medium ${
+                faceEnrollStatus.ok
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                {faceEnrollStatus.msg}
+              </div>
+            )}
+            <FaceCapture mode="enroll" onCapture={handleFaceCapture} />
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

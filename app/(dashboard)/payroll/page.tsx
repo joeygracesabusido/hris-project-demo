@@ -1,52 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calculator, DollarSign, Clock, CalendarDays, CheckCircle, FileText, Download, Printer, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-
-interface Employee {
-  id: string;
-  fullName: string;
-  employeeNumber: number;
-  department: string;
-  position: string;
-  basicSalary: number;
-  payrollFrequency: string;
-  payType?: string;
-  dailyRate?: number;
-  email?: string;
-}
-
-interface PayrollRecord {
-  id: string;
-  employeeId: string;
-  month: number;
-  year: number;
-  periodStart: string;
-  periodEnd: string;
-  basicSalary: number;
-  workDays: number;
-  daysWorked: number;
-  otHours: number;
-  otPay: number;
-  holidayPay: number;
-  grossPay: number;
-  sssEmployee: number;
-  philhealthEmployee: number;
-  pagibigEmployee: number;
-  withholdingTax: number;
-  otherDeductions: number;
-  totalDeductions: number;
-  netPay: number;
-  status: string;
-  createdAt: string;
-  employee: Employee;
-  adjustmentAdd?: number;
-  adjustmentDeduct?: number;
-  adjustmentReason?: string;
-  lateMinutes?: number;
-  undertimeMinutes?: number;
-}
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { usePayrollList, useComputePayroll, useDeletePayroll } from '@/hooks/use-payroll';
+import { useEmployees } from '@/hooks/use-employees';
+import { getClientCookies } from '@/lib/client-cookies';
+import type { Employee } from '@/hooks/use-employees';
+import type { PayrollRecord, PayrollEmployee } from '@/hooks/use-payroll';
 
 interface PayrollResult {
   payroll: {
@@ -70,7 +45,7 @@ interface PayrollResult {
     daysWorked: number;
   };
   details: {
-    employee: Employee;
+    employee: PayrollEmployee;
     period: { frequency: string };
     earnings: { baseSalary: number; overtimePay: number; holidayPay: number; grossPay: number };
     deductions: {
@@ -100,15 +75,19 @@ interface PayrollResult {
 }
 
 export default function PayrollPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: employees = [], isLoading: employeesLoading } = useEmployees();
+  const { data: payrollRecords = [], isLoading: recordsLoading } = usePayrollList();
+  const computePayroll = useComputePayroll();
+  const deletePayrollMutation = useDeletePayroll();
+  const { toast } = useToast()
   const [computing, setComputing] = useState(false);
   const [result, setResult] = useState<PayrollResult | null>(null);
   const [error, setError] = useState('');
   const [mounted, setMounted] = useState(false);
   const [expandedPayrollId, setExpandedPayrollId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     employeeId: '',
@@ -123,16 +102,29 @@ export default function PayrollPage() {
   const [userRole, setUserRole] = useState<string>('');
   const [userEmployeeId, setUserEmployeeId] = useState<string>('');
 
+  useEffect(() => {
+    setMounted(true);
+    const cookies = getClientCookies();
+    if (!cookies.isLoggedIn) {
+      window.location.href = '/login';
+      return;
+    }
+    setUserRole(cookies.userRole);
+
+    if (cookies.userEmail) {
+      const currentUser = employees.find((emp: Employee) => emp.email === cookies.userEmail);
+      if (currentUser) setUserEmployeeId(currentUser.id);
+    }
+  }, [employees]);
+
   const toggleDeduction = (deduction: string) => {
     setFormData(prev => {
       const isSelected = prev.deductions.includes(deduction);
-      const newDeductions = isSelected
-        ? prev.deductions.filter(d => d !== deduction)
-        : [...prev.deductions, deduction];
-      
       return {
         ...prev,
-        deductions: newDeductions
+        deductions: isSelected
+          ? prev.deductions.filter(d => d !== deduction)
+          : [...prev.deductions, deduction]
       };
     });
   };
@@ -149,73 +141,6 @@ export default function PayrollPage() {
       record.employee.department?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
-
-  const fetchEmployees = async (userEmail: string) => {
-    try {
-      const res = await fetch('/api/employees', { credentials: 'include' });
-      
-      if (!res.ok) {
-        console.error('Failed to fetch employees, status:', res.status);
-        setLoading(false);
-        return;
-      }
-      
-      const text = await res.text();
-      if (!text) {
-        console.error('Empty response from employees API');
-        setLoading(false);
-        return;
-      }
-      
-      const data = JSON.parse(text);
-      console.log('Employees response:', data);
-      if (Array.isArray(data)) {
-        setEmployees(data);
-        const currentUserEmployee = data.find((emp: Employee) => emp.email === userEmail);
-        if (currentUserEmployee) {
-          setUserEmployeeId(currentUserEmployee.id);
-        }
-      } else if (data.error) {
-        console.error('Error fetching employees:', data.error);
-      }
-    } catch (err) {
-      console.error('Failed to fetch employees:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchPayrollRecords = async () => {
-    try {
-      const res = await fetch('/api/payroll', { credentials: 'include' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setPayrollRecords(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch payroll records:', err);
-    }
-  };
-
-  useEffect(() => {
-    setMounted(true);
-    if (typeof document === 'undefined') return;
-    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split('=');
-      acc[key] = value;
-      return acc;
-    }, {} as Record<string, string>);
-    if (cookies.isLoggedIn !== 'true') {
-      window.location.href = '/login';
-      return;
-    }
-    const role = cookies.userRole || '';
-    const email = cookies.userEmail || '';
-    setUserRole(role);
-    fetchEmployees(email);
-    fetchPayrollRecords();
-  }, []);
 
   if (!mounted) return null;
 
@@ -237,26 +162,7 @@ export default function PayrollPage() {
     };
 
     try {
-      const res = await fetch('/api/payroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      if (!text) {
-        setError('Empty response from server');
-        setComputing(false);
-        return;
-      }
-
-      const data = JSON.parse(text);
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to compute payroll');
-        return;
-      }
+      const data = await computePayroll.mutateAsync(payload);
 
       if (isAllEmployees) {
         setResult({
@@ -285,7 +191,6 @@ export default function PayrollPage() {
             netPay: 0,
           },
         } as unknown as PayrollResult);
-        fetchPayrollRecords();
       } else {
         setResult(data);
       }
@@ -390,13 +295,13 @@ export default function PayrollPage() {
           <div class="section">
             <h3>Earnings</h3>
             <div class="row">
-              <span>Base Salary ${employee.payType === 'DAILY' ? `<br/><small class="text-gray-500">(${result.payroll.daysWorked || 0} days @ ${formatCurrency(employee.dailyRate || 0)}/day)</small>` : ''}</span>
+              <span>Base Salary ${employee.payType === 'DAILY' ? `<br/><small>(${result.payroll.daysWorked || 0} days @ ${formatCurrency(employee.dailyRate || 0)}/day)</small>` : ''}</span>
               <span>${formatCurrency(result.details.earnings.baseSalary)}</span>
             </div>
-            <div className="row"><span>Overtime (${result.details.totals.totalOtHours} hrs)</span><span>+${formatCurrency(result.details.earnings.overtimePay)}</span></div>
-            ${result.details.totals.holidayDays > 0 ? `<div className="row"><span>Holiday (${result.details.totals.holidayDays} day(s))</span><span>+${formatCurrency(result.details.earnings.holidayPay)}</span></div>` : ''}
+            <div class="row"><span>Overtime (${result.details.totals.totalOtHours} hrs)</span><span>+${formatCurrency(result.details.earnings.overtimePay)}</span></div>
+            ${result.details.totals.holidayDays > 0 ? `<div class="row"><span>Holiday (${result.details.totals.holidayDays} day(s))</span><span>+${formatCurrency(result.details.earnings.holidayPay)}</span></div>` : ''}
             ${(result.payroll.adjustmentAdd ?? 0) > 0 ? `<div class="row"><span>Adjustment (+)</span><span>+${formatCurrency(result.payroll.adjustmentAdd!)}</span></div>` : ''}
-            <div className="row total gross"><span>Gross Pay</span><span>${formatCurrency(result.details.earnings.grossPay)}</span></div>
+            <div class="row total gross"><span>Gross Pay</span><span>${formatCurrency(result.details.earnings.grossPay)}</span></div>
           </div>
           <div class="section">
             <h3>Deductions</h3>
@@ -473,7 +378,7 @@ export default function PayrollPage() {
           <div class="section">
             <h3>Earnings</h3>
             <div class="row">
-              <span>Base Salary ${employee.payType === 'DAILY' ? `<br/><small class="text-gray-500">(${record.daysWorked} days @ ${formatCurrency(employee.dailyRate || 0)}/day)</small>` : ''}</span>
+              <span>Base Salary ${employee.payType === 'DAILY' ? `<br/><small>(${record.daysWorked} days @ ${formatCurrency(employee.dailyRate || 0)}/day)</small>` : ''}</span>
               <span>${formatCurrency(record.basicSalary || (employee.payType === 'DAILY' && employee.dailyRate ? employee.dailyRate * record.daysWorked : 0))}</span>
             </div>
             <div class="row"><span>Overtime (${record.otHours} hrs)</span><span>+${formatCurrency(record.otPay)}</span></div>
@@ -488,7 +393,9 @@ export default function PayrollPage() {
             <div class="row"><span>PhilHealth</span><span>-${formatCurrency(record.philhealthEmployee)}</span></div>
             <div class="row"><span>Pag-IBIG</span><span>-${formatCurrency(record.pagibigEmployee)}</span></div>
             <div class="row"><span>Withholding Tax</span><span>-${formatCurrency(record.withholdingTax)}</span></div>
-            <div class="row"><span>Other Deductions</span><span>-${formatCurrency(record.otherDeductions)}</span></div>
+            ${record.lateDeduction && record.lateDeduction > 0 ? `<div class="row"><span>Lates (${record.lateMinutes || 0} min)</span><span>-${formatCurrency(record.lateDeduction)}</span></div>` : ''}
+            ${record.undertimeDeduction && record.undertimeDeduction > 0 ? `<div class="row"><span>Undertime (${record.undertimeMinutes || 0} min)</span><span>-${formatCurrency(record.undertimeDeduction)}</span></div>` : ''}
+            ${(record.otherDeductions - (record.lateDeduction || 0) - (record.undertimeDeduction || 0)) > 0 ? `<div class="row"><span>Other Deductions</span><span>-${formatCurrency(record.otherDeductions - (record.lateDeduction || 0) - (record.undertimeDeduction || 0))}</span></div>` : ''}
             <div class="row total deductions"><span>Total Deductions</span><span>-${formatCurrency(record.totalDeductions)}</span></div>
           </div>
           <div class="section" style="background: #ecfdf5; border-color: #059669;">
@@ -508,28 +415,16 @@ export default function PayrollPage() {
     printWindow.document.close();
   };
 
-  const handleDeletePayroll = async (payrollId: string) => {
-    if (!confirm('Are you sure you want to delete this payroll record? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeletePayroll = (payrollId: string) => {
+    setDeleteTargetId(payrollId)
+    setDeleteDialogOpen(true)
+  }
 
-    try {
-      const res = await fetch(`/api/payroll?id=${payrollId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete payroll');
-        return;
-      }
-
-      fetchPayrollRecords();
-    } catch (err) {
-      console.error('Delete payroll error:', err);
-      alert('Failed to delete payroll');
-    }
+  const confirmDeletePayroll = async () => {
+    if (!deleteTargetId) return
+    await deletePayrollMutation.mutateAsync(deleteTargetId)
+    setDeleteDialogOpen(false)
+    setDeleteTargetId(null)
   };
 
   const frequencies = [
@@ -537,6 +432,8 @@ export default function PayrollPage() {
     { value: 'SEMIMONTHLY', label: 'Semi-monthly' },
     { value: 'MONTHLY', label: 'Monthly' },
   ];
+
+  const loading = employeesLoading || recordsLoading;
 
   return (
     <div className="space-y-6">
@@ -548,73 +445,88 @@ export default function PayrollPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <p className="text-gray-500">Loading employees...</p>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-gray-500">Loading employees...</p>
+          </CardContent>
+        </Card>
       ) : employees.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <p className="text-red-500">No employees found. Please add employees first.</p>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-red-500">No employees found. Please add employees first.</p>
+          </CardContent>
+        </Card>
       ) : null}
 
       {!loading && employees.length > 0 && userRole !== 'EMPLOYEE' && (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Calculator className="w-5 h-5" />
-            Compute Payroll
-          </h2>
-
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Calculator className="w-5 h-5" />
+              Compute Payroll
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
           <form onSubmit={handleCompute} className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Employee
               </label>
-              <select
-                name="employeeId"
+              <Select
                 value={formData.employeeId}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onValueChange={(value) => {
+                  setFormData(prev => ({ ...prev, employeeId: value }))
+                  setResult(null)
+                }}
               >
-                <option value="">Select Employee</option>
-                <option value="all">All Employees</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.fullName} - {emp.position}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.fullName} - {emp.position}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Pay Frequency
             </label>
-            <select
-              name="frequency"
+            <Select
               value={formData.frequency}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onValueChange={(value) => {
+                setFormData(prev => ({ ...prev, frequency: value }))
+                setResult(null)
+              }}
             >
-              {frequencies.map((freq) => (
-                <option key={freq.value} value={freq.value}>
-                  {freq.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                {frequencies.map((freq) => (
+                  <SelectItem key={freq.value} value={freq.value}>
+                    {freq.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Period Start
             </label>
-            <input
+            <Input
               type="date"
               name="periodStart"
               value={formData.periodStart}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -622,13 +534,12 @@ export default function PayrollPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Period End
             </label>
-            <input
+            <Input
               type="date"
               name="periodEnd"
               value={formData.periodEnd}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -647,13 +558,11 @@ export default function PayrollPage() {
                 { id: 'pagibig_loan', label: 'Pag-IBIG Loan' },
               ].map((d) => (
                 <label key={d.id} className="flex items-center gap-2 cursor-pointer group px-2 py-1 hover:bg-white rounded transition-colors">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     id={`deduction-${d.id}`}
                     checked={formData.deductions.includes(d.id)}
-                    onChange={() => toggleDeduction(d.id)}
+                    onCheckedChange={() => toggleDeduction(d.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                   />
                   <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition-colors cursor-pointer select-none">
                     {d.label}
@@ -672,7 +581,7 @@ export default function PayrollPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Additional Earnings (+)
                 </label>
-                <input
+                <Input
                   type="number"
                   name="adjustmentAdd"
                   value={formData.adjustmentAdd}
@@ -680,7 +589,6 @@ export default function PayrollPage() {
                   min="0"
                   step="0.01"
                   placeholder="0.00"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Backpay, bonus, etc.</p>
               </div>
@@ -688,7 +596,7 @@ export default function PayrollPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Deductions (-)
                 </label>
-                <input
+                <Input
                   type="number"
                   name="adjustmentDeduct"
                   value={formData.adjustmentDeduct}
@@ -696,7 +604,6 @@ export default function PayrollPage() {
                   min="0"
                   step="0.01"
                   placeholder="0.00"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Overpayment recovery</p>
               </div>
@@ -704,23 +611,22 @@ export default function PayrollPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Reason
                 </label>
-                <input
+                <Input
                   type="text"
                   name="adjustmentReason"
                   value={formData.adjustmentReason}
                   onChange={(e) => setFormData({ ...formData, adjustmentReason: e.target.value })}
                   placeholder="e.g., Backpay for January 2026"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
             </div>
           </div>
 
           <div className="md:col-span-4">
-            <button
+            <Button
               type="submit"
               disabled={computing || !formData.employeeId}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="flex items-center gap-2"
             >
               {computing ? (
                 <>
@@ -733,7 +639,7 @@ export default function PayrollPage() {
                   {isAllEmployees ? 'Compute All Payroll' : 'Compute Payroll'}
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -742,15 +648,16 @@ export default function PayrollPage() {
             {error}
           </div>
         )}
-      </div>
+      </CardContent>
+        </Card>
       )}
 
       {result && userRole !== 'EMPLOYEE' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="p-6 border-b bg-gray-50">
+        <Card>
+          <CardHeader className="bg-gray-50 border-b">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold">{result.details.employee.fullName}</h2>
+                <CardTitle className="text-xl">{result.details.employee.fullName}</CardTitle>
                 <p className="text-gray-500">
                   {result.details.employee.position} - {result.details.employee.department}
                 </p>
@@ -759,25 +666,27 @@ export default function PayrollPage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <button 
+                <Button 
                   onClick={() => handleExport(result)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  variant="outline"
+                  className="flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   Export
-                </button>
-                <button 
+                </Button>
+                <Button 
                   onClick={() => handlePrint(result)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  variant="outline"
+                  className="flex items-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
                   Print
-                </button>
+                </Button>
               </div>
             </div>
-          </div>
+          </CardHeader>
 
-          <div className="p-6">
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-4">
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -916,7 +825,7 @@ export default function PayrollPage() {
                 </p>
               </div>
             </div>
-          </div>
+        </CardContent>
 
           <div className="p-4 bg-gray-50 border-t text-sm text-gray-500">
             <p>
@@ -924,174 +833,199 @@ export default function PayrollPage() {
               Semi-monthly frequency divides monthly salary by 2.
             </p>
           </div>
-        </div>
+        </Card>
       )}
 
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!open) { setDeleteDialogOpen(false); setDeleteTargetId(null); } }}>
+        <DialogContent className="sm:max-w-md p-0 gap-0">
+          <DialogHeader className="p-8 pb-0">
+            <DialogTitle className="text-center">
+              <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6"><Trash2 className="w-10 h-10" /></div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Delete Payroll Record?</h2>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-8 pt-4">
+            <p className="text-gray-500 mb-8 text-sm leading-relaxed text-center">This will permanently remove this payroll record from the system. This action cannot be reversed.</p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeleteTargetId(null); }} className="flex-1 h-11">Cancel</Button>
+              <Button onClick={confirmDeletePayroll} disabled={deletePayrollMutation.isPending} className="flex-1 h-11 bg-red-600 hover:bg-red-700">{deletePayrollMutation.isPending ? 'Deleting...' : 'Yes, Delete'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {payrollRecords.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-2">
               <FileText className="w-5 h-5" />
               {userRole === 'EMPLOYEE' ? 'My Payroll History' : 'Payroll History'}
-            </h2>
+            </CardTitle>
             {userRole !== 'EMPLOYEE' && (
             <div className="relative">
-              <input
+              <Input
                 type="text"
                 placeholder="Search by employee name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-64 pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full sm:w-64 pl-4 pr-10"
               />
-              <button
+              <Button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-2 text-gray-400 hover:text-gray-600"
               >
                 {searchQuery && '×'}
-              </button>
+              </Button>
             </div>
             )}
-          </div>
+          </CardHeader>
           {filteredPayrollRecords.length === 0 && searchQuery ? (
             <div className="p-6 text-center text-gray-500">
               No payroll records found for &quot;{searchQuery}&quot;
             </div>
           ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Basic Salary</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Gross Pay</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Deductions</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Net Pay</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Payslip</th>
-                  {userRole === 'ADMIN' && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredPayrollRecords.map((record) => (
-                  <>
-                    <tr key={record.id} className="hover:bg-gray-50">
-                      {userRole !== 'EMPLOYEE' && (
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{record.employee.fullName}</div>
-                        <div className="text-sm text-gray-500">{record.employee.position}</div>
-                      </td>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {userRole !== 'EMPLOYEE' && (
+                <TableHead>Employee</TableHead>
+                )}
+                <TableHead>Period</TableHead>
+                <TableHead className="text-right">Basic Salary</TableHead>
+                <TableHead className="text-right">Gross Pay</TableHead>
+                <TableHead className="text-right">Deductions</TableHead>
+                <TableHead className="text-right">Net Pay</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Payslip</TableHead>
+                {userRole === 'ADMIN' && (
+                <TableHead className="text-center">Actions</TableHead>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredPayrollRecords.map((record) => (
+                <React.Fragment key={record.id}>
+                  <TableRow>
+                    {userRole !== 'EMPLOYEE' && (
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{record.employee.fullName}</div>
+                      <div className="text-sm text-gray-500">{record.employee.position}</div>
+                    </TableCell>
+                    )}
+                    <TableCell className="text-sm text-gray-600">
+                      {new Date(record.periodStart).toLocaleDateString()} - {new Date(record.periodEnd).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right text-gray-600">{formatCurrency(record.basicSalary)}</TableCell>
+                    <TableCell className="text-right text-gray-600">{formatCurrency(record.grossPay)}</TableCell>
+                    <TableCell className="text-right text-red-600">{formatCurrency(record.totalDeductions)}</TableCell>
+                    <TableCell className="text-right font-semibold text-green-600">{formatCurrency(record.netPay)}</TableCell>
+                    <TableCell className="text-center">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        record.status === 'PROCESSED' ? 'bg-green-100 text-green-700' :
+                        record.status === 'APPROVED' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {record.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        onClick={() => handlePrintRecord(record)}
+                        variant="ghost"
+                        size="icon"
+                        className="text-blue-600 hover:bg-blue-50 mr-1"
+                        title="Print payslip"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        onClick={() => setExpandedPayrollId(expandedPayrollId === record.id ? null : record.id)}
+                        variant="ghost"
+                        size="icon"
+                      >
+                        {expandedPayrollId === record.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {userRole === 'ADMIN' && (
+                        <Button
+                          onClick={() => handleDeletePayroll(record.id)}
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-600 hover:bg-red-50"
+                          title="Delete payroll record"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       )}
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(record.periodStart).toLocaleDateString()} - {new Date(record.periodEnd).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(record.basicSalary)}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(record.grossPay)}</td>
-                      <td className="px-4 py-3 text-right text-red-600">{formatCurrency(record.totalDeductions)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-green-600">{formatCurrency(record.netPay)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          record.status === 'PROCESSED' ? 'bg-green-100 text-green-700' :
-                          record.status === 'APPROVED' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {record.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handlePrintRecord(record)}
-                          className="p-1 hover:bg-blue-50 text-blue-600 rounded mr-1"
-                          title="Print payslip"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setExpandedPayrollId(expandedPayrollId === record.id ? null : record.id)}
-                          className="p-1 hover:bg-gray-100 rounded"
-                        >
-                          {expandedPayrollId === record.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {userRole === 'ADMIN' && (
-                          <button
-                            onClick={() => handleDeletePayroll(record.id)}
-                            className="p-1 hover:bg-red-50 text-red-600 rounded"
-                            title="Delete payroll record"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                    {expandedPayrollId === record.id && (
-                      <tr>
-                        <td colSpan={userRole === 'EMPLOYEE' ? 7 : 9} className="bg-gray-50 px-4 py-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Earnings</h4>
-                              <div className="space-y-1 text-sm">
-                                <div className="flex justify-between"><span className="text-gray-600">Base Salary</span><span>{formatCurrency(record.basicSalary)}</span></div>
-                                <div className="flex justify-between"><span className="text-gray-600">OT Hours</span><span>{record.otHours} hrs</span></div>
-                                <div className="flex justify-between"><span className="text-gray-600">OT Pay</span><span>{formatCurrency(record.otPay)}</span></div>
-                                {record.holidayPay && record.holidayPay > 0 && (
-                                  <>
-                                    <div className="flex justify-between text-green-600"><span className="text-gray-600">Holiday Pay</span><span>{formatCurrency(record.holidayPay)}</span></div>
-                                    <div className="text-xs text-gray-500 pl-4">Holiday computation included in gross pay</div>
-                                  </>
-                                )}
-                                {(record.adjustmentAdd ?? 0) > 0 && (
-                                  <div className="flex justify-between text-green-600"><span className="text-gray-600">Adjustment (+)</span><span>+{formatCurrency(record.adjustmentAdd!)}</span></div>
-                                )}
-                                {(record.adjustmentDeduct ?? 0) > 0 && (
-                                  <div className="flex justify-between text-red-600"><span className="text-gray-600">Adjustment (-)</span><span>-{formatCurrency(record.adjustmentDeduct!)}</span></div>
-                                )}
-                                {record.adjustmentReason && (
-                                  <div className="text-xs text-gray-500 italic">Reason: {record.adjustmentReason}</div>
-                                )}
-                                <div className="flex justify-between font-medium border-t pt-1"><span>Gross Pay</span><span>{formatCurrency(record.grossPay)}</span></div>
-                              </div>
-                            </div>
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Deductions</h4>
-                              <div className="space-y-1 text-sm">
-                                {(record.lateMinutes ?? 0) > 0 && (
-                                  <div className="flex justify-between"><span className="text-gray-600">Lates ({(record.lateMinutes ?? 0)} min)</span><span className="text-red-600">{formatCurrency(((record.lateMinutes ?? 0) / 60) * (record.basicSalary / 22 / 8))}</span></div>
-                                )}
-                                {(record.undertimeMinutes ?? 0) > 0 && (
-                                  <div className="flex justify-between"><span className="text-gray-600">Undertime ({(record.undertimeMinutes ?? 0)} min)</span><span className="text-red-600">{formatCurrency(((record.undertimeMinutes ?? 0) / 60) * (record.basicSalary / 22 / 8))}</span></div>
-                                )}
-                                <div className="flex justify-between"><span className="text-gray-600">SSS</span><span>{formatCurrency(record.sssEmployee)}</span></div>
-                                <div className="flex justify-between"><span className="text-gray-600">PhilHealth</span><span>{formatCurrency(record.philhealthEmployee)}</span></div>
-                                <div className="flex justify-between"><span className="text-gray-600">Pag-IBIG</span><span>{formatCurrency(record.pagibigEmployee)}</span></div>
-                                <div className="flex justify-between"><span className="text-gray-600">Withholding Tax</span><span>{formatCurrency(record.withholdingTax)}</span></div>
-                                {record.otherDeductions > 0 && (
-                                  <div className="flex justify-between"><span className="text-gray-600">Other (Absences/Cash Advance)</span><span>{formatCurrency(record.otherDeductions)}</span></div>
-                                )}
-                                <div className="flex justify-between font-medium border-t pt-1"><span>Total Deductions</span><span className="text-red-600">{formatCurrency(record.totalDeductions)}</span></div>
-                              </div>
-                            </div>
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
-                              <div className="space-y-1 text-sm">
-                                <div className="flex justify-between"><span className="text-gray-600">Work Days</span><span>{record.daysWorked} / {record.workDays}</span></div>
-                                <div className="flex justify-between font-medium border-t pt-1"><span>Net Pay</span><span className="text-green-600 text-lg">{formatCurrency(record.netPay)}</span></div>
-                              </div>
+                    </TableCell>
+                  </TableRow>
+                  {expandedPayrollId === record.id && (
+                    <TableRow>
+                      <TableCell colSpan={userRole === 'EMPLOYEE' ? 6 : 8} className="bg-gray-50 px-4 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Earnings</h4>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between"><span className="text-gray-600">Base Salary</span><span>{formatCurrency(record.basicSalary)}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-600">OT Hours</span><span>{record.otHours} hrs</span></div>
+                              <div className="flex justify-between"><span className="text-gray-600">OT Pay</span><span>{formatCurrency(record.otPay)}</span></div>
+                              {record.holidayPay && record.holidayPay > 0 && (
+                                <>
+                                  <div className="flex justify-between text-green-600"><span className="text-gray-600">Holiday Pay</span><span>{formatCurrency(record.holidayPay)}</span></div>
+                                  <div className="text-xs text-gray-500 pl-4">Holiday computation included in gross pay</div>
+                                </>
+                              )}
+                              {(record.adjustmentAdd ?? 0) > 0 && (
+                                <div className="flex justify-between text-green-600"><span className="text-gray-600">Adjustment (+)</span><span>+{formatCurrency(record.adjustmentAdd!)}</span></div>
+                              )}
+                              {(record.adjustmentDeduct ?? 0) > 0 && (
+                                <div className="flex justify-between text-red-600"><span className="text-gray-600">Adjustment (-)</span><span>-{formatCurrency(record.adjustmentDeduct!)}</span></div>
+                              )}
+                              {record.adjustmentReason && (
+                                <div className="text-xs text-gray-500 italic">Reason: {record.adjustmentReason}</div>
+                              )}
+                              <div className="flex justify-between font-medium border-t pt-1"><span>Gross Pay</span><span>{formatCurrency(record.grossPay)}</span></div>
                             </div>
                           </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Deductions</h4>
+                            <div className="space-y-1 text-sm">
+                              {(record.lateMinutes ?? 0) > 0 && (
+                                <div className="flex justify-between"><span className="text-gray-600">Lates ({(record.lateMinutes ?? 0)} min)</span><span className="text-red-600">{formatCurrency(record.lateDeduction ?? 0)}</span></div>
+                              )}
+                              {(record.undertimeMinutes ?? 0) > 0 && (
+                                <div className="flex justify-between"><span className="text-gray-600">Undertime ({(record.undertimeMinutes ?? 0)} min)</span><span className="text-red-600">{formatCurrency(record.undertimeDeduction ?? 0)}</span></div>
+                              )}
+                              <div className="flex justify-between"><span className="text-gray-600">SSS</span><span>{formatCurrency(record.sssEmployee)}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-600">PhilHealth</span><span>{formatCurrency(record.philhealthEmployee)}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-600">Pag-IBIG</span><span>{formatCurrency(record.pagibigEmployee)}</span></div>
+                              <div className="flex justify-between"><span className="text-gray-600">Withholding Tax</span><span>{formatCurrency(record.withholdingTax)}</span></div>
+                              {record.otherDeductions > 0 && (
+                                <div className="flex justify-between"><span className="text-gray-600">Other (Absences/Cash Advance)</span><span>{formatCurrency(record.otherDeductions)}</span></div>
+                              )}
+                              <div className="flex justify-between font-medium border-t pt-1"><span>Total Deductions</span><span className="text-red-600">{formatCurrency(record.totalDeductions)}</span></div>
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between"><span className="text-gray-600">Work Days</span><span>{record.daysWorked} / {record.workDays}</span></div>
+                              <div className="flex justify-between font-medium border-t pt-1"><span>Net Pay</span><span className="text-green-600 text-lg">{formatCurrency(record.netPay)}</span></div>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              ))}
+            </TableBody>
+          </Table>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );

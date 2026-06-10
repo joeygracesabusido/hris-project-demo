@@ -1,30 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { cookies } from 'next/headers';
+import { getRequestSession } from '@/lib/auth-helpers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies();
-    const isLoggedIn = cookieStore.get('isLoggedIn')?.value;
-
-    if (isLoggedIn !== 'true') {
+    try {
+      await getRequestSession(request);
+    } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('[Face Descriptor API] Fetching for employeeId:', params.id);
+    const { id } = await params
+
+    console.log('[Face Descriptor API] Fetching for employeeId:', id);
     
-    const employee = await prisma.employee.findUnique({
-      where: { id: params.id },
+    const employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id },
+          { userId: id },
+        ],
+      },
       select: { faceDescriptor: true, fullName: true, employeeId: true },
     });
 
     if (!employee) {
-      console.log('[Face Descriptor API] Employee not found:', params.id);
+      console.log('[Face Descriptor API] Employee not found:', id);
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 

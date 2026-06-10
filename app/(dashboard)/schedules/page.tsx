@@ -23,6 +23,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -44,6 +45,14 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
 interface Shift {
@@ -53,6 +62,7 @@ interface Shift {
   endTime: string;
   color: string;
   isOff: boolean;
+  gracePeriodMinutes: number;
 }
 
 interface Employee {
@@ -86,11 +96,13 @@ export default function ShiftSchedulePage() {
     startTime: '',
     endTime: '',
     isOff: false,
+    gracePeriodMinutes: 0,
     color: 'bg-blue-100 border-blue-500 text-blue-700'
   });
 
   // Calculate the 7 days to display
   const startDate = startOfWeek(currentDate, { weekStartsOn: 1 }); // Start on Monday
+  const startDateStr = format(startDate, 'yyyy-MM-dd'); // stable string key for deps
   const weekDays = eachDayOfInterval({
     start: startDate,
     end: addDays(startDate, 6),
@@ -101,8 +113,8 @@ export default function ShiftSchedulePage() {
       setLoading(true);
       setError(null);
 
-      const startStr = format(startDate, 'yyyy-MM-dd');
-      const endStr = format(addDays(startDate, 6), 'yyyy-MM-dd');
+      const startStr = startDateStr;
+      const endStr = format(addDays(new Date(startDateStr), 6), 'yyyy-MM-dd');
 
       console.log(`[Fetch] Range: ${startStr} to ${endStr}`);
 
@@ -133,7 +145,7 @@ export default function ShiftSchedulePage() {
     } finally {
       setLoading(false);
     }
-  }, [startDate]);
+  }, [startDateStr]);
 
   useEffect(() => {
     fetchData();
@@ -153,7 +165,7 @@ export default function ShiftSchedulePage() {
 
       if (response.ok) {
         setShifts(prev => [...prev, data]);
-        setNewShift({ name: '', startTime: '', endTime: '', isOff: false, color: 'bg-blue-100 border-blue-500 text-blue-700' });
+        setNewShift({ name: '', startTime: '', endTime: '', isOff: false, gracePeriodMinutes: 0, color: 'bg-blue-100 border-blue-500 text-blue-700' });
         toast({ title: "Success", description: "Shift created successfully" });
       } else {
         toast({ variant: "destructive", title: "Error", description: data.error || "Failed to create shift" });
@@ -316,11 +328,11 @@ export default function ShiftSchedulePage() {
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="outline" 
-                className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-                disabled={loading || employees.length === 0}
+                className="gap-2 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                disabled={true}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-                Bulk Assign
+                Bulk Assign (Disabled)
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -360,16 +372,21 @@ export default function ShiftSchedulePage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Start Time</Label>
-                        <input type="time" className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newShift.startTime} onChange={e => setNewShift({...newShift, startTime: e.target.value})} required />
+                        <Input type="time" className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newShift.startTime} onChange={e => setNewShift({...newShift, startTime: e.target.value})} required />
                       </div>
                       <div className="space-y-2">
                         <Label>End Time</Label>
-                        <input type="time" className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newShift.endTime} onChange={e => setNewShift({...newShift, endTime: e.target.value})} required />
+                        <Input type="time" className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newShift.endTime} onChange={e => setNewShift({...newShift, endTime: e.target.value})} required />
                       </div>
                     </div>
                     <div className="flex items-center gap-3 py-2">
                       <input type="checkbox" id="isOffS" className="w-5 h-5 rounded border-gray-300 text-blue-600" checked={newShift.isOff} onChange={e => setNewShift({...newShift, isOff: e.target.checked})} />
                       <Label htmlFor="isOffS" className="cursor-pointer">Mark as Rest Day / Off</Label>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Grace Period (minutes before counted as late)</Label>
+                      <Input type="number" min="0" max="60" className="bg-white" value={newShift.gracePeriodMinutes} onChange={e => setNewShift({...newShift, gracePeriodMinutes: parseInt(e.target.value) || 0})} />
+                      <p className="text-xs text-gray-500">0 = no grace period. Common: 5–15 min.</p>
                     </div>
                     <Button type="submit" className="w-full bg-blue-600" disabled={creating}>{creating ? "Creating..." : "Create Shift"}</Button>
                   </form>
@@ -382,8 +399,9 @@ export default function ShiftSchedulePage() {
                         <div>
                           <p className="font-bold">{shift.name}</p>
                           <div className="flex items-center gap-2 mt-1">
-                             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{shift.startTime} - {shift.endTime}</span>
-                             {shift.isOff && <span className="text-[10px] font-bold text-pink-600 uppercase">Off Day</span>}
+                             <Badge variant="secondary">{shift.startTime} - {shift.endTime}</Badge>
+                             {shift.isOff && <Badge variant="destructive" className="text-[10px]">Off Day</Badge>}
+                             {!shift.isOff && <span className="text-[10px] text-gray-500">Grace: {shift.gracePeriodMinutes ?? 0} min</span>}
                           </div>
                         </div>
                         <div className={`px-3 py-1.5 rounded-lg text-xs font-bold border-b-2 ${shift.color}`}>{shift.name.split('_')[0]}</div>
@@ -403,55 +421,53 @@ export default function ShiftSchedulePage() {
       </div>
 
       <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                <th className="p-4 text-left font-medium text-gray-600 border-r min-w-[280px]"><div className="flex items-center gap-1">Employees <ChevronDown className="w-4 h-4" /></div></th>
-                {weekDays.map(day => (<th key={day.toString()} className="p-4 text-left font-medium text-gray-600 min-w-[180px]"><span className="text-sm">{format(day, 'EEE, d MMM yyyy')}</span></th>))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && schedules.length === 0 ? (
-                <tr><td colSpan={8} className="p-20 text-center"><div className="flex flex-col items-center gap-3"><RefreshCcw className="w-8 h-8 animate-spin text-blue-600" /><p className="text-gray-500 font-medium">Loading employee schedules...</p></div></td></tr>
-              ) : employees.length === 0 ? (
-                <tr><td colSpan={8} className="p-20 text-center text-gray-500"><div className="max-w-xs mx-auto space-y-2"><p className="font-bold text-gray-900">No Employees Found</p><p className="text-sm">We couldn&apos;t find any active employees. Please check the Employees page.</p><Button variant="outline" size="sm" onClick={fetchData} className="mt-4">Refresh List</Button></div></td></tr>
-              ) : (
-                employees.map(employee => (
-                  <tr key={employee.id} className="border-b last:border-0 hover:bg-gray-50/50 transition-colors">
-                    <td className="p-4 border-r">
-                      <div className="flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-10 h-10 border bg-gray-50"><AvatarFallback className="text-xs font-bold">{getInitials(employee.fullName)}</AvatarFallback></Avatar>
-                          <div><p className="font-bold text-gray-900 text-sm">{employee.fullName}</p><p className="text-[11px] text-gray-500 uppercase font-medium">{employee.position} • {employee.department}</p></div>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-56"><DropdownMenuSub><DropdownMenuSubTrigger className="text-xs font-medium">Fill Week with...</DropdownMenuSubTrigger><DropdownMenuPortal><DropdownMenuSubContent className="w-56">{shifts.map(shift => (<DropdownMenuItem key={shift.id} onClick={() => handleFillWeek(employee.id, shift.id)} className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer"><span className="font-bold text-[11px] uppercase">{shift.name}</span><span className="text-[10px] text-gray-500">{shift.startTime} - {shift.endTime}</span></DropdownMenuItem>))}</DropdownMenuSubContent></DropdownMenuPortal></DropdownMenuSub></DropdownMenuContent>
-                        </DropdownMenu>
+        <Table className="w-full border-collapse">
+          <TableHeader>
+            <TableRow className="bg-gray-50 border-b">
+              <TableHead className="p-4 text-left font-medium text-gray-600 border-r min-w-[280px]"><div className="flex items-center gap-1">Employees <ChevronDown className="w-4 h-4" /></div></TableHead>
+              {weekDays.map(day => (<TableHead key={day.toString()} className="p-4 text-left font-medium text-gray-600 min-w-[180px]"><span className="text-sm">{format(day, 'EEE, d MMM yyyy')}</span></TableHead>))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading && schedules.length === 0 ? (
+              <TableRow><TableCell colSpan={8} className="p-20 text-center"><div className="flex flex-col items-center gap-3"><RefreshCcw className="w-8 h-8 animate-spin text-blue-600" /><p className="text-gray-500 font-medium">Loading employee schedules...</p></div></TableCell></TableRow>
+            ) : employees.length === 0 ? (
+              <TableRow><TableCell colSpan={8} className="p-20 text-center text-gray-500"><div className="max-w-xs mx-auto space-y-2"><p className="font-bold text-gray-900">No Employees Found</p><p className="text-sm">We couldn&apos;t find any active employees. Please check the Employees page.</p><Button variant="outline" size="sm" onClick={fetchData} className="mt-4">Refresh List</Button></div></TableCell></TableRow>
+            ) : (
+              employees.map(employee => (
+                <TableRow key={employee.id} className="border-b last:border-0 hover:bg-gray-50/50 transition-colors">
+                  <TableCell className="p-4 border-r">
+                    <div className="flex items-center justify-between group">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10 border bg-gray-50"><AvatarFallback className="text-xs font-bold">{getInitials(employee.fullName)}</AvatarFallback></Avatar>
+                        <div><p className="font-bold text-gray-900 text-sm">{employee.fullName}</p><p className="text-[11px] text-gray-500 uppercase font-medium">{employee.position} • {employee.department}</p></div>
                       </div>
-                    </td>
-                    {weekDays.map(day => {
-                      const sch = getShiftForEmployeeAndDate(employee.id, day);
-                      return (
-                        <td key={day.toString()} className="p-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className={`w-full text-left p-2.5 rounded-lg border-b-4 transition-all hover:brightness-95 ${sch?.shift?.color || 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                                <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[11px] font-bold uppercase tracking-tight">{sch?.shift?.name || 'No Shift'}</span><span className="text-[10px] opacity-80 font-medium">{sch?.shift?.startTime && sch?.shift?.endTime ? `${sch.shift.startTime} - ${sch.shift.endTime}` : '-'}</span></div><ChevronDown className="w-3 h-3 opacity-40" /></div>
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-56">{shifts.map(shift => (<DropdownMenuItem key={shift.id} onClick={() => handleUpdateShift(employee.id, shift.id, day)} className="flex flex-col items-start gap-0.5 py-2 cursor-pointer"><span className="font-bold text-xs uppercase">{shift.name}</span><span className="text-[10px] text-gray-500">{shift.startTime} - {shift.endTime}</span></DropdownMenuItem>))}</DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-56"><DropdownMenuSub><DropdownMenuSubTrigger className="text-xs font-medium">Fill Week with...</DropdownMenuSubTrigger><DropdownMenuPortal><DropdownMenuSubContent className="w-56">{shifts.map(shift => (<DropdownMenuItem key={shift.id} onClick={() => handleFillWeek(employee.id, shift.id)} className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer"><span className="font-bold text-[11px] uppercase">{shift.name}</span><span className="text-[10px] text-gray-500">{shift.startTime} - {shift.endTime}</span></DropdownMenuItem>))}</DropdownMenuSubContent></DropdownMenuPortal></DropdownMenuSub></DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                  {weekDays.map(day => {
+                    const sch = getShiftForEmployeeAndDate(employee.id, day);
+                    return (
+                      <TableCell key={day.toString()} className="p-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className={`w-full text-left p-2.5 rounded-lg border-b-4 transition-all hover:brightness-95 ${sch?.shift?.color || 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                              <div className="flex items-center justify-between"><div className="flex flex-col"><span className="text-[11px] font-bold uppercase tracking-tight">{sch?.shift?.name || 'No Shift'}</span><span className="text-[10px] opacity-80 font-medium">{sch?.shift?.startTime && sch?.shift?.endTime ? `${sch.shift.startTime} - ${sch.shift.endTime}` : '-'}</span></div><ChevronDown className="w-3 h-3 opacity-40" /></div>
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-56">{shifts.map(shift => (<DropdownMenuItem key={shift.id} onClick={() => handleUpdateShift(employee.id, shift.id, day)} className="flex flex-col items-start gap-0.5 py-2 cursor-pointer"><span className="font-bold text-xs uppercase">{shift.name}</span><span className="text-[10px] text-gray-500">{shift.startTime} - {shift.endTime}</span></DropdownMenuItem>))}</DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       <div className="flex items-center justify-between px-4 py-4 text-sm text-gray-500 border-t mt-4">
