@@ -434,6 +434,9 @@ async function main() {
 }
 
 async function seedApprovalRules() {
+  await prisma.approvalRule.deleteMany({});
+  await prisma.approvalDelegation.deleteMany({});
+
   const hrUsers = await prisma.user.findMany({
     where: { role: 'HR' },
     include: { employees: true },
