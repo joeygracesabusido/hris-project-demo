@@ -28,7 +28,6 @@ export function useSubDepartments(departmentId?: string) {
   return useQuery({
     queryKey: ['sub-departments', departmentId],
     queryFn: () => fetchSubDepartments(departmentId),
-    enabled: !!departmentId || true,
   })
 }
 
