@@ -8,51 +8,16 @@ export interface ResolvedApprover {
   scope: ApprovalScope
 }
 
-async function findHrEmployee(): Promise<string | null> {
+async function findHrEmployee(): Promise<{ id: string; fullName: string } | null> {
   const hrUser = await prisma.user.findFirst({
     where: { role: 'HR' },
     include: { employees: true },
   })
-  return hrUser?.employees?.[0]?.id ?? null
-}
 
-async function resolveApproverForScope(
-  scope: ApprovalScope,
-  employeeId: string,
-  departmentId?: string
-): Promise<string | null> {
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
-    include: { subDepartment: { include: { department: true } } },
-  })
+  const hrEmployee = hrUser?.employees?.[0]
+  if (!hrEmployee) return null
 
-  if (!employee) return null
-
-  switch (scope) {
-    case 'DIRECT_REPORTS':
-      return employee.managerId ?? null
-
-    case 'SUB_DEPARTMENT':
-      if (employee.subDepartment?.department?.headId) {
-        return employee.subDepartment.department.headId
-      }
-      return employee.managerId ?? null
-
-    case 'DEPARTMENT': {
-      const deptId = departmentId ?? employee.subDepartment?.department?.id
-      if (deptId) {
-        const dept = await prisma.department.findUnique({ where: { id: deptId } })
-        return dept?.headId ?? null
-      }
-      return employee.managerId ?? null
-    }
-
-    case 'ALL':
-      return findHrEmployee()
-
-    default:
-      return null
-  }
+  return { id: hrEmployee.id, fullName: hrEmployee.fullName }
 }
 
 async function checkDelegation(
@@ -80,72 +45,83 @@ export async function resolveApprovalChain(
   value: number,
   requestDate?: Date
 ): Promise<ResolvedApprover[]> {
-  const rules = await prisma.approvalRule.findMany({
-    where: {
-      requestType,
-      isActive: true,
-      minDays: { lte: value },
-      maxDays: { gte: value },
-    },
-    orderBy: [{ level: 'asc' }, { minDays: 'asc' }],
-  })
+  try {
+    if (value < 0) return []
 
-  if (rules.length === 0) {
-    const hrId = await findHrEmployee()
-    if (hrId) {
-      const hr = await prisma.employee.findUnique({
-        where: { id: hrId },
-        select: { fullName: true },
-      })
-      return [{ employeeId: hrId, fullName: hr?.fullName ?? 'HR', level: 1, scope: 'ALL' }]
+    const rules = await prisma.approvalRule.findMany({
+      where: {
+        requestType,
+        isActive: true,
+        minDays: { lte: value },
+        maxDays: { gte: value },
+      },
+      orderBy: [{ level: 'asc' }, { minDays: 'asc' }],
+    })
+
+    if (rules.length === 0) {
+      const hr = await findHrEmployee()
+      if (hr) {
+        return [{ employeeId: hr.id, fullName: hr.fullName, level: 1, scope: 'ALL' }]
+      }
+      return []
     }
+
+    // Batch pre-fetch all rule approvers
+    const approverIds = [...new Set(rules.map(r => r.approverId).filter((id): id is string => id !== null))]
+    const employees = await prisma.employee.findMany({
+      where: { id: { in: approverIds } },
+      select: { id: true, fullName: true, isActive: true },
+    })
+    const employeeMap = new Map(employees.map(e => [e.id, { fullName: e.fullName, isActive: e.isActive }]))
+
+    const chain: ResolvedApprover[] = []
+    const seenApproverIds = new Set<string>()
+
+    for (const rule of rules) {
+      if (!rule.approverId) continue
+
+      let approverId = rule.approverId
+
+      // Check delegation
+      if (requestDate) {
+        const delegatedTo = await checkDelegation(approverId, requestType, requestDate, requestDate)
+        if (delegatedTo) {
+          approverId = delegatedTo
+        }
+      }
+
+      // Skip if approver is the requestor
+      if (approverId === employeeId) {
+        console.warn(`Approver ${rule.approverId} is the requestor, escalating to next level`)
+        continue
+      }
+
+      // Skip if approver is not active
+      const approver = employeeMap.get(approverId) ?? await prisma.employee.findUnique({
+        where: { id: approverId },
+        select: { fullName: true, isActive: true },
+      })
+
+      if (!approver?.isActive) {
+        console.warn(`Approver ${approverId} is not active, skipping to next level`)
+        continue
+      }
+
+      // Skip if already in chain
+      if (seenApproverIds.has(approverId)) continue
+
+      seenApproverIds.add(approverId)
+      chain.push({
+        employeeId: approverId,
+        fullName: approver.fullName,
+        level: rule.level,
+        scope: rule.scope,
+      })
+    }
+
+    return chain
+  } catch (error) {
+    console.error('Error resolving approval chain:', error)
     return []
   }
-
-  const chain: ResolvedApprover[] = []
-  const seenApproverIds = new Set<string>()
-
-  for (const rule of rules) {
-    if (!rule.approverId) continue
-
-    let approverId = rule.approverId
-
-    // Check delegation
-    if (requestDate) {
-      const delegatedTo = await checkDelegation(approverId, requestType, requestDate, requestDate)
-      if (delegatedTo) {
-        approverId = delegatedTo
-      }
-    }
-
-    // Skip if approver is the requestor
-    if (approverId === employeeId) {
-      console.warn(`Approver ${rule.approverId} is the requestor, escalating to next level`)
-      continue
-    }
-
-    // Skip if approver is not active
-    const approver = await prisma.employee.findUnique({
-      where: { id: approverId },
-      select: { fullName: true, isActive: true },
-    })
-
-    if (!approver?.isActive) {
-      console.warn(`Approver ${approverId} is not active, skipping to next level`)
-      continue
-    }
-
-    // Skip if already in chain
-    if (seenApproverIds.has(approverId)) continue
-
-    seenApproverIds.add(approverId)
-    chain.push({
-      employeeId: approverId,
-      fullName: approver.fullName,
-      level: rule.level,
-      scope: rule.scope,
-    })
-  }
-
-  return chain
 }
