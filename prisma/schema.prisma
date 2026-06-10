@@ -97,6 +97,7 @@ model Employee {
   managerId     String?   @db.ObjectId
   manager       Employee? @relation("ReportingLine", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subordinates  Employee[] @relation("ReportingLine")
+  headedDepartments Department[] @relation("DepartmentHead")
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -340,6 +341,20 @@ model OfficeLocation {
   @@map("officelocations")
 }
 
+enum ApprovalRequestType {
+  LEAVE
+  OVERTIME
+  TRANSFER
+  EXPENSE
+}
+
+enum ApprovalScope {
+  DIRECT_REPORTS
+  SUB_DEPARTMENT
+  DEPARTMENT
+  ALL
+}
+
 /// Holiday model for managing company holidays
 model Holiday {
   id        String      @id @default(auto()) @map("_id") @db.ObjectId
@@ -366,6 +381,9 @@ model Department {
   isActive    Boolean   @default(true)
 
   subDepartments SubDepartment[]
+
+  headId    String?   @db.ObjectId
+  head      Employee? @relation("DepartmentHead", fields: [headId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -504,4 +522,39 @@ model Payroll {
   @@unique([employeeId, periodStart, periodEnd])
   @@index([employeeId, month, year])
   @@map("payrolls")
+}
+
+model ApprovalRule {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  approverId    String          @db.ObjectId
+  requestType   ApprovalRequestType
+  scope         ApprovalScope   @default(DIRECT_REPORTS)
+  minDays       Int             @default(0)
+  maxDays       Int             @default(999)
+  level         Int             @default(1)
+  departmentId  String?         @db.ObjectId
+  isActive      Boolean         @default(true)
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([requestType, scope])
+  @@index([approverId])
+  @@map("approvalrules")
+}
+
+model ApprovalDelegation {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  approverId      String            @db.ObjectId
+  delegatedToId   String            @db.ObjectId
+  requestType     ApprovalRequestType?
+  delegationStart DateTime
+  delegationEnd   DateTime
+  isActive        Boolean           @default(true)
+
+  createdAt       DateTime          @default(now())
+
+  @@index([approverId])
+  @@index([delegationStart, delegationEnd])
+  @@map("approvaldelegations")
 }
