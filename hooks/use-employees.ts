@@ -8,7 +8,10 @@ export interface Employee {
   email: string
   employeeId: string
   position: string
-  department: string
+  subDepartmentId: string | null
+  subDepartment?: { id: string; name: string; code: string }
+  projectId: string | null
+  project?: { id: string; name: string; code: string }
   payType: string
   basicSalary: number
   dailyRate: number
@@ -24,6 +27,53 @@ export interface Employee {
   pagibigNo: string
   bankName: string
   bankAccountNo: string
+}
+
+export interface CreateEmployee {
+  fullName: string
+  email: string
+  position: string
+  subDepartmentId: string
+  projectId?: string
+  payType: string
+  basicSalary: number
+  dailyRate?: number
+  payrollFrequency: string
+  managerId?: string
+  hireDate: string
+  tin?: string
+  sssNo?: string
+  philhealthNo?: string
+  pagibigNo?: string
+  bankName?: string
+  bankAccountNo?: string
+  employeeStatus?: string
+  regularizationDate?: string
+}
+
+export interface UpdateEmployee {
+  id: string
+  fullName?: string
+  email?: string
+  position?: string
+  subDepartmentId?: string
+  projectId?: string | null
+  payType?: string
+  basicSalary?: number
+  dailyRate?: number
+  payrollFrequency?: string
+  managerId?: string | null
+  hireDate?: string
+  tin?: string
+  sssNo?: string
+  philhealthNo?: string
+  pagibigNo?: string
+  bankName?: string
+  bankAccountNo?: string
+  isActive?: boolean
+  employeeStatus?: string
+  regularizationDate?: string | null
+  employeeId?: string
 }
 
 async function fetchEmployees(): Promise<Employee[]> {
@@ -45,7 +95,7 @@ export function useCreateEmployee() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
+    mutationFn: async (data: CreateEmployee) => {
       const res = await fetch('/api/employees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,7 +120,7 @@ export function useUpdateEmployee() {
   const { toast } = useToast()
 
   return useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
+    mutationFn: async (data: UpdateEmployee) => {
       const res = await fetch('/api/employees', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
