@@ -97,6 +97,19 @@ async function main() {
     },
   })
 
+  const hr1 = await prisma.user.upsert({
+    where: { username: 'hr1' },
+    update: {},
+    create: {
+      username: 'hr1',
+      email: 'hr1@hris.ph',
+      name: 'Carla Reyes',
+      password: hashedPassword,
+      role: 'HR',
+      status: 'ACTIVE',
+    },
+  })
+
   const emp5 = await prisma.user.upsert({
     where: { username: 'employee5' },
     update: {},
@@ -271,6 +284,25 @@ async function main() {
       bankName: 'Security Bank',
       bankAccountNo: '7890123456',
     },
+    {
+      userId: hr1.id,
+      employeeNumber: 1008,
+      employeeId: 'EMP008',
+      fullName: 'Carla Reyes',
+      email: 'hr1@hris.ph',
+      position: 'HR Manager',
+      subDepartmentId: subDepts[2].id,
+      basicSalary: 50000,
+      payrollFrequency: 'MONTHLY',
+      hireDate: new Date('2024-01-01'),
+      isActive: true,
+      tin: '890123456789',
+      sssNo: '8901234567',
+      philhealthNo: '890123456789',
+      pagibigNo: '890123456789',
+      bankName: 'BPI',
+      bankAccountNo: '8901234567',
+    },
   ]
 
   const createdEmployees = []
@@ -385,17 +417,134 @@ async function main() {
   }
   console.log(`Created ${leaves.length} leave requests`)
 
+  await seedApprovalRules();
+
   console.log('\n=== Dummy Data Created Successfully ===')
   console.log('\nLogin Credentials:')
   console.log('  Admin: admin / 123456')
   console.log('  Manager 1: manager1 / 123456')
   console.log('  Manager 2: manager2 / 123456')
+  console.log('  HR: hr1 / 123456')
   console.log('  Employee 1-5: employee1-5 / 123456')
   console.log('\nFeatures:')
   console.log('  - Time logs with approved overtime for days 5, 12, 19')
   console.log('  - 3 approved business trip leaves')
   console.log('  - 1 pending business trip leave')
   console.log('  - Regular vacation and sick leaves')
+}
+
+async function seedApprovalRules() {
+  const hrUsers = await prisma.user.findMany({
+    where: { role: 'HR' },
+    include: { employees: true },
+  });
+
+  const managerUsers = await prisma.user.findMany({
+    where: { role: 'MANAGER' },
+    include: { employees: true },
+  });
+
+  const hrEmployee = hrUsers[0]?.employees?.[0];
+  if (!hrEmployee) {
+    console.log('No HR employee found, skipping approval rules seed');
+    return;
+  }
+
+  const managerEmployee = managerUsers[0]?.employees?.[0] ?? (await prisma.employee.findFirst());
+  if (!managerEmployee) {
+    console.log('No employees found, skipping approval rules seed');
+    return;
+  }
+
+  const departments = await prisma.department.findMany({ where: { isActive: true } });
+
+  for (const dept of departments) {
+    await prisma.approvalRule.create({
+      data: {
+        approverId: managerEmployee.id,
+        requestType: 'LEAVE',
+        scope: 'DIRECT_REPORTS',
+        minDays: 0,
+        maxDays: 2,
+        level: 1,
+        departmentId: dept.id,
+      },
+    });
+
+    await prisma.approvalRule.create({
+      data: {
+        approverId: dept.headId ?? managerEmployee.id,
+        requestType: 'LEAVE',
+        scope: 'DEPARTMENT',
+        minDays: 3,
+        maxDays: 5,
+        level: 2,
+        departmentId: dept.id,
+      },
+    });
+
+    await prisma.approvalRule.create({
+      data: {
+        approverId: hrEmployee.id,
+        requestType: 'LEAVE',
+        scope: 'ALL',
+        minDays: 6,
+        maxDays: 999,
+        level: 3,
+        departmentId: dept.id,
+      },
+    });
+
+    await prisma.approvalRule.create({
+      data: {
+        approverId: managerEmployee.id,
+        requestType: 'OVERTIME',
+        scope: 'DIRECT_REPORTS',
+        minDays: 0,
+        maxDays: 4,
+        level: 1,
+        departmentId: dept.id,
+      },
+    });
+
+    await prisma.approvalRule.create({
+      data: {
+        approverId: hrEmployee.id,
+        requestType: 'OVERTIME',
+        scope: 'DEPARTMENT',
+        minDays: 5,
+        maxDays: 999,
+        level: 2,
+        departmentId: dept.id,
+      },
+    });
+
+    await prisma.approvalRule.create({
+      data: {
+        approverId: dept.headId ?? managerEmployee.id,
+        requestType: 'TRANSFER',
+        scope: 'DEPARTMENT',
+        minDays: 0,
+        maxDays: 999,
+        level: 1,
+        departmentId: dept.id,
+      },
+    });
+
+    await prisma.approvalRule.create({
+      data: {
+        approverId: dept.headId ?? managerEmployee.id,
+        requestType: 'EXPENSE',
+        scope: 'DEPARTMENT',
+        minDays: 0,
+        maxDays: 999,
+        level: 1,
+        departmentId: dept.id,
+      },
+    });
+  }
+
+  console.log(`Seeded ${departments.length * 7} default approval rules`);
 }
 
 main()
