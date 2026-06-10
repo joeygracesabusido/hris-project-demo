@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubDepartments, useCreateSubDepartment, useUpdateSubDepartment, useDeleteSubDepartment } from '@/hooks/use-sub-departments';
 import { useDepartments } from '@/hooks/use-departments';
 import { getClientCookies } from '@/lib/client-cookies';
+import { hasAdminAccess } from '@/lib/auth-helpers';
 import type { SubDepartment } from '@/hooks/use-sub-departments';
 import type { Department } from '@/hooks/use-departments';
 
@@ -97,9 +98,14 @@ export default function SubDepartmentsPage() {
 
   const handleDelete = async () => {
     if (!selectedSubDepartment) return;
-    await deleteSubDepartment.mutateAsync(selectedSubDepartment.id);
-    setShowDeleteModal(false);
-    setSelectedSubDepartment(null);
+    try {
+      await deleteSubDepartment.mutateAsync(selectedSubDepartment.id);
+      setShowDeleteModal(false);
+      setSelectedSubDepartment(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'An error occurred';
+      toast({ variant: 'destructive', title: 'Error', description: msg });
+    }
   };
 
   const filteredSubDepartments = subDepartments.filter(sd => {
@@ -108,7 +114,7 @@ export default function SubDepartmentsPage() {
     return matchesSearch && matchesDept;
   });
 
-  const isAdmin = userRole === 'ADMIN';
+  const isAdmin = hasAdminAccess(userRole);
 
   return (
     <div className="space-y-6">
@@ -136,7 +142,7 @@ export default function SubDepartmentsPage() {
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value=" ">All Departments</SelectItem>
+              <SelectItem value="">All Departments</SelectItem>
               {departments.filter((d: Department) => d.isActive).map((dept: Department) => (
                 <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
               ))}
