@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 import { computeLateMinutes, computeUndertimeMinutes, parseTimeString } from '@/lib/late-computation';
 
+export const maxDuration = 60;
+
 interface PunchTime {
   time: Date;
   type: 'IN' | 'OUT';

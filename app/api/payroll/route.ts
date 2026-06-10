@@ -11,6 +11,8 @@ import { hasAdminAccess } from '@/lib/auth-helpers';
 import { getEmployeeIdForUser } from '@/lib/user-employee-link';
 import { recomputeTimeLogFromSchedule } from '@/lib/late-computation';
 
+export const maxDuration = 60;
+
 const MANILA_TIMEZONE = 'Asia/Manila';
 
 function toManilaDateKey(date: Date): string {

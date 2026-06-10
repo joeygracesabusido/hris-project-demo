@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { startOfDay, endOfDay } from 'date-fns';
 
+export const maxDuration = 60;
+
 interface TouchlinkLog {
   employeeId: string;
   dateTime: Date;

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
