@@ -112,6 +112,29 @@ async function main() {
 
   console.log('Created users')
 
+  // Seed Departments
+  const departments = await Promise.all([
+    prisma.department.upsert({ where: { code: 'IT' }, update: {}, create: { name: 'IT', code: 'IT' } }),
+    prisma.department.upsert({ where: { code: 'HR' }, update: {}, create: { name: 'HR', code: 'HR' } }),
+    prisma.department.upsert({ where: { code: 'FIN' }, update: {}, create: { name: 'Finance', code: 'FIN' } }),
+  ])
+
+  // Seed Sub-Departments
+  const subDepts = await Promise.all([
+    prisma.subDepartment.upsert({ where: { code: 'IT-DEV' }, update: {}, create: { name: 'Development', code: 'IT-DEV', departmentId: departments[0].id } }),
+    prisma.subDepartment.upsert({ where: { code: 'IT-SUP' }, update: {}, create: { name: 'Support', code: 'IT-SUP', departmentId: departments[0].id } }),
+    prisma.subDepartment.upsert({ where: { code: 'HR-MAIN' }, update: {}, create: { name: 'HR Operations', code: 'HR-MAIN', departmentId: departments[1].id } }),
+    prisma.subDepartment.upsert({ where: { code: 'FIN-MAIN' }, update: {}, create: { name: 'Finance Operations', code: 'FIN-MAIN', departmentId: departments[2].id } }),
+  ])
+
+  // Seed Projects
+  const projects = await Promise.all([
+    prisma.project.upsert({ where: { code: 'HRIS' }, update: {}, create: { name: 'HRIS System', code: 'HRIS', subDepartmentId: subDepts[0].id } }),
+    prisma.project.upsert({ where: { code: 'PAY' }, update: {}, create: { name: 'Payroll System', code: 'PAY', subDepartmentId: subDepts[0].id } }),
+  ])
+
+  console.log('Created departments, sub-departments, and projects')
+
   const employees = [
     {
       userId: manager1.id,
@@ -120,7 +143,8 @@ async function main() {
       fullName: 'John Smith',
       email: 'manager1@hris.ph',
       position: 'IT Manager',
-      department: 'IT',
+      subDepartmentId: subDepts[0].id,
+      projectId: projects[0].id,
       basicSalary: 60000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-01-15'),
@@ -139,7 +163,7 @@ async function main() {
       fullName: 'Sarah Johnson',
       email: 'manager2@hris.ph',
       position: 'HR Manager',
-      department: 'HR',
+      subDepartmentId: subDepts[2].id,
       basicSalary: 55000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-02-01'),
@@ -158,7 +182,8 @@ async function main() {
       fullName: 'Juan dela Cruz',
       email: 'employee1@hris.ph',
       position: 'Software Engineer',
-      department: 'IT',
+      subDepartmentId: subDepts[0].id,
+      projectId: projects[0].id,
       basicSalary: 45000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-03-01'),
@@ -177,7 +202,7 @@ async function main() {
       fullName: 'Maria Santos',
       email: 'employee2@hris.ph',
       position: 'Marketing Specialist',
-      department: 'Marketing',
+      subDepartmentId: subDepts[1].id,
       basicSalary: 35000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-04-01'),
@@ -196,7 +221,7 @@ async function main() {
       fullName: 'Pedro Garcia',
       email: 'employee3@hris.ph',
       position: 'Accountant',
-      department: 'Finance',
+      subDepartmentId: subDepts[3].id,
       basicSalary: 40000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-05-01'),
@@ -215,7 +240,7 @@ async function main() {
       fullName: 'Ana Reyes',
       email: 'employee4@hris.ph',
       position: 'HR Specialist',
-      department: 'HR',
+      subDepartmentId: subDepts[2].id,
       basicSalary: 32000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-06-01'),
@@ -234,7 +259,7 @@ async function main() {
       fullName: 'Michael Lee',
       email: 'employee5@hris.ph',
       position: 'Sales Executive',
-      department: 'Sales',
+      subDepartmentId: subDepts[1].id,
       basicSalary: 30000,
       payrollFrequency: 'MONTHLY',
       hireDate: new Date('2024-07-01'),
