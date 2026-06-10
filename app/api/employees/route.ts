@@ -45,6 +45,10 @@ export async function GET(request: Request) {
     const employees = await prisma.employee.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
+      include: {
+        subDepartment: true,
+        project: true,
+      },
     });
     return NextResponse.json(employees);
   } catch (error) {
@@ -70,10 +74,14 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
-      fullName, email, position, department, basicSalary, dailyRate, payType,
+      fullName, email, position, subDepartmentId, projectId, basicSalary, dailyRate, payType,
       payrollFrequency, managerId, hireDate, tin, sssNo, philhealthNo, pagibigNo, bankName, bankAccountNo,
       employeeStatus, regularizationDate,
     } = body;
+
+    if (!subDepartmentId) {
+      return NextResponse.json({ error: 'Sub-department is required' }, { status: 400 });
+    }
 
     const maxEmployee = await prisma.employee.findFirst({ 
       orderBy: { employeeNumber: 'desc' },
@@ -88,7 +96,9 @@ export async function POST(request: Request) {
         employeeNumber: nextNumber,
         fullName, email,
         employeeId,
-        position, department,
+        position,
+        subDepartmentId,
+        projectId: projectId || null,
         payType: payType || 'MONTHLY',
         basicSalary: parseFloat(basicSalary || '0'),
         dailyRate: payType === 'DAILY' ? (parseFloat(dailyRate) || calculateDailyRate(parseFloat(basicSalary))) : parseFloat(dailyRate || '0'),
@@ -133,7 +143,7 @@ export async function PUT(request: Request) {
 
     const updateData: Record<string, unknown> = {};
     const allowedFields = [
-      'employeeId', 'fullName', 'email', 'position', 'department', 'basicSalary', 'dailyRate', 'payType',
+      'employeeId', 'fullName', 'email', 'position', 'subDepartmentId', 'projectId', 'basicSalary', 'dailyRate', 'payType',
       'payrollFrequency', 'managerId', 'hireDate', 'tin', 'sssNo', 'philhealthNo',
       'pagibigNo', 'bankName', 'bankAccountNo', 'isActive', 'employeeStatus', 'regularizationDate'
     ];
