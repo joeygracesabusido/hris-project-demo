@@ -9,17 +9,12 @@ declare const globalThis: {
   prismaGlobal: PrismaClient | undefined;
 } & typeof global;
 
-// Standard singleton pattern for Prisma Client to prevent multiple instances in development
+// Singleton pattern for Prisma Client — use globalThis cache in ALL environments
+// (serverless functions on Vercel need this to prevent connection exhaustion)
 const getPrisma = () => {
-  if (process.env.NODE_ENV === "production") {
-    return prismaClientSingleton();
-  }
-  
   if (!globalThis.prismaGlobal) {
-    console.log('[Prisma] Creating fresh instance');
     globalThis.prismaGlobal = prismaClientSingleton();
   }
-  
   return globalThis.prismaGlobal;
 }
 
