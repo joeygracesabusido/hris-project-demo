@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban, List } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -22,13 +22,21 @@ interface NavItem {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, iconColor: 'text-sky-500' },
   {
+    href: '/master-list',
+    label: 'Master List',
+    icon: List,
+    iconColor: 'text-blue-500',
+    subItems: [
+      { href: '/employees', label: 'Employees', icon: Users, iconColor: 'text-blue-400', adminOnly: true },
+    ],
+  },
+  {
     href: '/hris',
     label: 'HRIS',
     icon: Users,
     iconColor: 'text-emerald-500',
     subItems: [
       { href: '/users', label: 'Users', icon: UserCheck, iconColor: 'text-emerald-400', adminOnly: true },
-      { href: '/employees', label: 'Employees', icon: Users, iconColor: 'text-emerald-400', adminOnly: true },
       { href: '/schedules', label: 'Shift Schedule', icon: CalendarDays, iconColor: 'text-emerald-400' },
       { href: '/leave-credits', label: 'Leave Credits', icon: Award, iconColor: 'text-emerald-400' },
       { href: '/leaves', label: 'Leaves', icon: CalendarDays, iconColor: 'text-emerald-400' },
@@ -71,6 +79,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [masterListOpen, setMasterListOpen] = useState(false);
   const [hrisOpen, setHrisOpen] = useState(false);
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
@@ -99,7 +108,7 @@ export default function DashboardLayout({
       return true;
     }
     if (userRole === 'EMPLOYEE') {
-      return !['/users', '/employees', '/reports', '/settings'].includes(item.href);
+      return !['/users', '/reports', '/settings'].includes(item.href);
     }
     if (item.adminOnly && userRole !== 'ADMIN' && userRole !== 'HR') {
       return false;
@@ -113,7 +122,8 @@ export default function DashboardLayout({
     const Icon = item.icon;
 
     if (item.subItems) {
-      const isHrisActive = pathname.startsWith('/users') || pathname.startsWith('/employees') || pathname.startsWith('/schedules') || pathname.startsWith('/leave-credits') || pathname.startsWith('/leaves') || pathname.startsWith('/overtime') || pathname.startsWith('/time-logs') || pathname.startsWith('/holidays') || pathname.startsWith('/departments') || pathname.startsWith('/sub-departments') || pathname.startsWith('/projects');
+      const isMasterListActive = pathname.startsWith('/employees');
+      const isHrisActive = pathname.startsWith('/users') || pathname.startsWith('/schedules') || pathname.startsWith('/leave-credits') || pathname.startsWith('/leaves') || pathname.startsWith('/overtime') || pathname.startsWith('/time-logs') || pathname.startsWith('/holidays') || pathname.startsWith('/departments') || pathname.startsWith('/sub-departments') || pathname.startsWith('/projects');
       const isPayrollActive = pathname.startsWith('/payroll');
       const isReportsActive = pathname.startsWith('/reports');
       
@@ -121,7 +131,11 @@ export default function DashboardLayout({
       let open: boolean = false;
       let setOpen: (val: boolean) => void = () => {};
       
-      if (item.href === '/hris') {
+      if (item.href === '/master-list') {
+        isActive = isMasterListActive;
+        open = masterListOpen;
+        setOpen = setMasterListOpen;
+      } else if (item.href === '/hris') {
         isActive = isHrisActive;
         open = hrisOpen;
         setOpen = setHrisOpen;
