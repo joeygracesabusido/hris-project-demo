@@ -22,6 +22,7 @@ import {
 import { useGovInfo } from '@/hooks/use-gov-info';
 import { useDepartments } from '@/hooks/use-departments';
 import { getClientCookies } from '@/lib/client-cookies';
+import { ADMIN_ROLES } from '@/lib/auth-shared';
 
 export default function GovernmentInfoPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,11 +38,15 @@ export default function GovernmentInfoPage() {
     setUserRole(cookies.userRole || '');
   }, []);
 
-  const isAdminOrHRorManager = userRole === 'ADMIN' || userRole === 'HR' || userRole === 'MANAGER';
+  const isAdminOrHRorManager = (ADMIN_ROLES as readonly string[]).includes(userRole);
 
-  const { data: govInfoData, isLoading: loadingGovInfo } = useGovInfo(
+  const { data: govInfoData, isLoading: loadingGovInfo, error: govInfoError } = useGovInfo(
     departmentFilter === 'all' ? undefined : departmentFilter
   );
+
+  if (govInfoError) {
+    return <p className="text-destructive">Failed to load government info</p>;
+  }
   const { data: departments, isLoading: loadingDepts } = useDepartments();
 
   const filteredData = govInfoData?.filter((emp) =>

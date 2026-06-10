@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getEmployeeIdForUser } from '@/lib/user-employee-link';
-import { getRequestSession } from '@/lib/auth-helpers';
+import { getRequestSession, hasAdminAccess } from '@/lib/auth-helpers';
 
 export async function GET(request: Request) {
   try {
@@ -29,8 +29,8 @@ export async function GET(request: Request) {
       whereClause.subDepartmentId = { in: subDepts.map(sd => sd.id) };
     }
 
-    // EMPLOYEE role: only show their own record
-    if (userRole === 'EMPLOYEE') {
+    // Non-admin role: only show their own record
+    if (!hasAdminAccess(userRole)) {
       const linkedEmployeeId = await getEmployeeIdForUser(userEmail, userRole);
       if (linkedEmployeeId) {
         whereClause.id = linkedEmployeeId;
