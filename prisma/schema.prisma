@@ -98,6 +98,9 @@ model Employee {
   manager       Employee? @relation("ReportingLine", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subordinates  Employee[] @relation("ReportingLine")
   headedDepartments Department[] @relation("DepartmentHead")
+  approvalRules ApprovalRule[]
+  approvalDelegationsFrom ApprovalDelegation[] @relation("DelegationApprover")
+  approvalDelegationsTo ApprovalDelegation[] @relation("DelegationDelegate")
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -381,6 +384,7 @@ model Department {
   isActive    Boolean   @default(true)
 
   subDepartments SubDepartment[]
+  approvalRules  ApprovalRule[]
 
   headId    String?   @db.ObjectId
   head      Employee? @relation("DepartmentHead", fields: [headId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -527,12 +531,14 @@ model Payroll {
 model ApprovalRule {
   id            String          @id @default(auto()) @map("_id") @db.ObjectId
   approverId    String          @db.ObjectId
+  approver      Employee        @relation(fields: [approverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   requestType   ApprovalRequestType
   scope         ApprovalScope   @default(DIRECT_REPORTS)
   minDays       Int             @default(0)
   maxDays       Int             @default(999)
   level         Int             @default(1)
   departmentId  String?         @db.ObjectId
+  department    Department?     @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   isActive      Boolean         @default(true)
 
   createdAt     DateTime        @default(now())
@@ -546,15 +552,19 @@ model ApprovalRule {
 model ApprovalDelegation {
   id              String            @id @default(auto()) @map("_id") @db.ObjectId
   approverId      String            @db.ObjectId
+  approver        Employee          @relation("DelegationApprover", fields: [approverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   delegatedToId   String            @db.ObjectId
+  delegatedTo     Employee          @relation("DelegationDelegate", fields: [delegatedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   requestType     ApprovalRequestType?
   delegationStart DateTime
   delegationEnd   DateTime
   isActive        Boolean           @default(true)
 
   createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([approverId])
+  @@index([delegatedToId])
   @@index([delegationStart, delegationEnd])
   @@map("approvaldelegations")
 }
