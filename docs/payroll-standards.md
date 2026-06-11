@@ -34,6 +34,45 @@ All calculations must follow the current contribution tables for:
 - **Formula:** Total basic salary earned during the year / 12.
 - **Deadline:** Must be paid no later than December 24.
 
+### Legal Basis
+- **Presidential Decree No. 851** (1975) - The original "13th Month Pay Law"
+- **Memorandum Order No. 28** (1986) - Expanded coverage to all rank-and-file employees regardless of salary
+- **DOLE Labor Advisory No. 18** (2021) - Current comprehensive guidelines
+
+### Basic Salary Components
+**INCLUSIONS:** Fixed monthly salary, basic wage for hourly/daily workers, salary during paid leave
+**EXCLUSIONS:** Overtime pay, night shift differential, holiday pay, bonuses, allowances, commission-based pay (for non-rank-and-file)
+
+### Employee Coverage
+- **Rank-and-file employees:** ✅ All positions, regardless of salary
+- **Probationary employees:** ✅ If worked ≥1 month
+- **Contractual employees:** ✅ If rank-and-file, worked ≥1 month
+- **Part-time employees:** ✅ If rank-and-file, worked ≥1 month
+- **Seasonal workers:** ✅ If rank-and-file, worked ≥1 month
+- **Resigned/terminated employees:** ✅ Entitled to payment
+- **Managerial officers:** ❌ Discretionary at employer
+
+### Calculation Examples
+- **Full-year employee:** ₱20,000 monthly salary × 12 = ₱240,000 ÷ 12 = **₱20,000**
+- **6-month employee:** ₱15,000 monthly salary × 6 = ₱90,000 ÷ 12 = **₱7,500**
+- **With absences:** Actual earned amount ÷ 12 (based on days worked)
+
+### Tax Treatment (TRAIN Law)
+- **First ₱90,000 is tax-exempt** — 13th month pay and other bonuses combined up to ₱90,000 are non-taxable
+- **Amount exceeding ₱90,000** is subject to withholding tax based on the employee's tax bracket
+- **De minimis benefits** within statutory limits are also tax-exempt
+
+### Reporting Requirements
+- **DOLE Establishment Report System:** Submission deadline January 15 of following year
+- **Internal Documentation:** Payroll records, attendance records, payment receipts
+- **Record Retention:** Maintain records for at least 3 years
+
+### Common Mistakes to Avoid
+- Including excluded benefits (overtime, holiday pay, allowances)
+- Missing the December 24 deadline
+- Failing to report to DOLE Establishment Report System
+- Not maintaining proper documentation
+
 ## 6. Leave Credits (Standard Practice)
 - **Service Incentive Leave (SIL):** 5 days of leave with pay for employees with at least one year of service.
 - **Sick/Vacation Leave:** Based on company policy, typically accrued monthly.

@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import FaceCapture from '@/components/facial-recognition/FaceCapture';
 import { useEmployees, useCreateEmployee, useUpdateEmployee, useDeleteEmployee, useEnrollFace } from '@/hooks/use-employees';
@@ -371,252 +372,257 @@ export default function EmployeesPage() {
       )}
 
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) setShowModal(false); }}>
-        <DialogContent className="bg-slate-950 text-white sm:max-w-3xl max-h-[90vh] overflow-y-auto border-slate-800 p-0 gap-0">
-          <DialogHeader className="p-6 border-b border-slate-800 sticky top-0 bg-slate-950 z-10">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-blue-900/30 rounded-lg text-blue-400"><User className="w-5 h-5" /></div>
-              <DialogTitle className="text-white text-xl font-bold">{selectedEmployee ? 'Edit Employee Profile' : 'Register New Employee'}</DialogTitle>
-            </div>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          <DialogHeader className="p-6 border-b sticky top-0 bg-background z-10">
+            <DialogTitle className="text-xl font-bold">{selectedEmployee ? 'Edit Employee Profile' : 'Register New Employee'}</DialogTitle>
           </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-8">
-              {error && <div className="bg-red-900/20 text-red-400 p-4 rounded-xl text-sm font-medium border border-red-900/50">{error}</div>}
-              {userRole === 'EMPLOYEE' && <div className="bg-green-900/20 text-green-400 p-4 rounded-xl text-sm font-medium border border-green-900/50">View mode - Only Face Enrollment is enabled</div>}
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {error && <div className="bg-destructive/10 text-destructive p-4 rounded-xl text-sm font-medium border border-destructive/20">{error}</div>}
+            {userRole === 'EMPLOYEE' && <div className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 p-4 rounded-xl text-sm font-medium border border-emerald-200 dark:border-emerald-900/50">View mode - Only Face Enrollment is enabled</div>}
 
-              <section>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Personal & Role Info</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Full Name *</Label>
-                    <Input name="fullName" value={formData.fullName} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="Juan R. Dela Cruz" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Employee ID *</Label>
-                    <Input name="employeeId" value={formData.employeeId} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="EMP-0001" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Work Email *</Label>
-                    <Input type="email" name="email" value={formData.email} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="juan@company.com" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Position *</Label>
-                    <Input name="position" value={formData.position} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="Senior Developer" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 disabled:opacity-50" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Department *</Label>
-                    <Select
-                      value={selectedDepartmentId}
-                      onValueChange={(value) => {
-                        setSelectedDepartmentId(value)
-                        setSelectedSubDepartmentId('')
-                        setSelectedProjectId('')
-                      }}
-                      disabled={userRole === 'EMPLOYEE'}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
-                        <SelectValue placeholder="Select Department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.filter(d => d.isActive).map(d => (
-                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Sub-Department *</Label>
-                    <Select
-                      value={selectedSubDepartmentId}
-                      onValueChange={(value) => {
-                        setSelectedSubDepartmentId(value)
-                        setSelectedProjectId('')
-                      }}
-                      disabled={!selectedDepartmentId || userRole === 'EMPLOYEE'}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
-                        <SelectValue placeholder={selectedDepartmentId ? 'Select Sub-Department' : 'Select a department first'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subDepartments.filter(sd => sd.isActive).map(sd => (
-                          <SelectItem key={sd.id} value={sd.id}>{sd.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Project</Label>
-                    <Select
-                      value={selectedProjectId}
-                      onValueChange={(value) => setSelectedProjectId(value === '__none__' ? '' : value)}
-                      disabled={!selectedSubDepartmentId || userRole === 'EMPLOYEE'}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
-                        <SelectValue placeholder={selectedSubDepartmentId ? 'Select Project (optional)' : 'Select a sub-department first'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">No project</SelectItem>
-                        {projects.filter(p => p.isActive).map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Employment Status</Label>
-                    <Select
-                      value={formData.employeeStatus}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, employeeStatus: value }))}
-                      disabled={userRole === 'EMPLOYEE'}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white disabled:opacity-50">
-                        <SelectValue placeholder="Select Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PROBATIONARY">Probationary</SelectItem>
-                        <SelectItem value="REGULAR">Regular</SelectItem>
-                        <SelectItem value="RESIGNED">Resigned</SelectItem>
-                        <SelectItem value="TERMINATED">Terminated</SelectItem>
-                        <SelectItem value="ONDESIGN">On Designation</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Regularization Date</Label>
-                    <Input type="date" name="regularizationDate" value={formData.regularizationDate} onChange={handleChange} className="h-11 bg-slate-900 border-slate-700 text-white" />
-                    <p className="text-xs text-slate-500">Required when status is Regular</p>
-                  </div>
+            <section>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Personal &amp; Role Info</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input name="fullName" value={formData.fullName} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="Juan R. Dela Cruz" />
                 </div>
-              </section>
+                <div className="space-y-2">
+                  <Label>Employee ID *</Label>
+                  <Input name="employeeId" value={formData.employeeId} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="EMP-0001" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Work Email *</Label>
+                  <Input type="email" name="email" value={formData.email} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="juan@company.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Position *</Label>
+                  <Input name="position" value={formData.position} onChange={handleChange} required disabled={userRole === 'EMPLOYEE'} placeholder="Senior Developer" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Department *</Label>
+                  <Select
+                    value={selectedDepartmentId}
+                    onValueChange={(value) => {
+                      setSelectedDepartmentId(value)
+                      setSelectedSubDepartmentId('')
+                      setSelectedProjectId('')
+                    }}
+                    disabled={userRole === 'EMPLOYEE'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.filter(d => d.isActive).map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Sub-Department *</Label>
+                  <Select
+                    value={selectedSubDepartmentId}
+                    onValueChange={(value) => {
+                      setSelectedSubDepartmentId(value)
+                      setSelectedProjectId('')
+                    }}
+                    disabled={!selectedDepartmentId || userRole === 'EMPLOYEE'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedDepartmentId ? 'Select Sub-Department' : 'Select a department first'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subDepartments.filter(sd => sd.isActive).map(sd => (
+                        <SelectItem key={sd.id} value={sd.id}>{sd.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Project</Label>
+                  <Select
+                    value={selectedProjectId}
+                    onValueChange={(value) => setSelectedProjectId(value === '__none__' ? '' : value)}
+                    disabled={!selectedSubDepartmentId || userRole === 'EMPLOYEE'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedSubDepartmentId ? 'Select Project (optional)' : 'Select a sub-department first'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No project</SelectItem>
+                      {projects.filter(p => p.isActive).map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Employment Status</Label>
+                  <Select
+                    value={formData.employeeStatus}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, employeeStatus: value }))}
+                    disabled={userRole === 'EMPLOYEE'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PROBATIONARY">Probationary</SelectItem>
+                      <SelectItem value="REGULAR">Regular</SelectItem>
+                      <SelectItem value="RESIGNED">Resigned</SelectItem>
+                      <SelectItem value="TERMINATED">Terminated</SelectItem>
+                      <SelectItem value="ONDESIGN">On Designation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Regularization Date</Label>
+                  <Input type="date" name="regularizationDate" value={formData.regularizationDate} onChange={handleChange} />
+                  <p className="text-xs text-muted-foreground">Required when status is Regular</p>
+                </div>
+              </div>
+            </section>
 
-              <section className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <h3 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Wallet className="w-4 h-4" /> Payroll & Salary Settings
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-gray-500">Payment Type *</Label>
-                    <Select
-                      value={formData.payType}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, payType: value }))}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-white border rounded-lg font-bold">
-                        <SelectValue placeholder="Select pay type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="MONTHLY">Fixed Monthly Salary</SelectItem>
-                        <SelectItem value="DAILY">Daily Rate Basis</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+            <Separator />
 
-                  {formData.payType === 'DAILY' ? (
-                    <div className="space-y-1.5 animate-in slide-in-from-left-2 duration-200">
-                      <Label className="text-xs font-bold uppercase text-slate-400 text-orange-400">Daily Rate (PHP) *</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₱</span>
-                        <Input type="number" name="dailyRate" value={formData.dailyRate} onChange={handleChange} required placeholder="650" className="h-11 pl-8 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600 focus:ring-orange-500" />
-                      </div>
+            <section>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Wallet className="w-4 h-4" /> Payroll &amp; Salary Settings
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label>Payment Type *</Label>
+                  <Select
+                    value={formData.payType}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, payType: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select pay type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONTHLY">Fixed Monthly Salary</SelectItem>
+                      <SelectItem value="DAILY">Daily Rate Basis</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.payType === 'DAILY' ? (
+                  <div className="space-y-2">
+                    <Label>Daily Rate (PHP) *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                      <Input type="number" name="dailyRate" value={formData.dailyRate} onChange={handleChange} required placeholder="650" className="pl-8" />
                     </div>
-                  ) : (
-                    <div className="space-y-1.5 animate-in slide-in-from-left-2 duration-200">
-                      <Label className="text-xs font-bold uppercase text-slate-400 text-blue-400">Basic Monthly Salary (PHP) *</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₱</span>
-                        <Input type="number" name="basicSalary" value={formData.basicSalary} onChange={handleChange} required placeholder="25000" className="h-11 pl-8 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                      </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Basic Monthly Salary (PHP) *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                      <Input type="number" name="basicSalary" value={formData.basicSalary} onChange={handleChange} required placeholder="25000" className="pl-8" />
                     </div>
-                  )}
-
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Payroll Frequency *</Label>
-                    <Select
-                      value={formData.payrollFrequency}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, payrollFrequency: value }))}
-                    >
-                      <SelectTrigger className="w-full h-11 bg-slate-900 border-slate-700 text-white">
-                        <SelectValue placeholder="Select frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {frequencies.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Hire Date *</Label>
-                    <Input type="date" name="hireDate" value={formData.hireDate} onChange={handleChange} required className="h-11 bg-slate-900 border-slate-700 text-white" />
-                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Payroll Frequency *</Label>
+                  <Select
+                    value={formData.payrollFrequency}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, payrollFrequency: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {frequencies.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Government IDs</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">TIN *</Label>
-                    <Input name="tin" value={formData.tin} onChange={handleChange} required placeholder="000-000-000-000" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">SSS No. *</Label>
-                    <Input name="sssNo" value={formData.sssNo} onChange={handleChange} required placeholder="00-0000000-0" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">PhilHealth No. *</Label>
-                    <Input name="philhealthNo" value={formData.philhealthNo} onChange={handleChange} required placeholder="00-000000000-0" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Pag-IBIG MID *</Label>
-                    <Input name="pagibigNo" value={formData.pagibigNo} onChange={handleChange} required placeholder="0000-0000-0000" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Hire Date *</Label>
+                  <Input type="date" name="hireDate" value={formData.hireDate} onChange={handleChange} required />
                 </div>
-              </section>
+              </div>
+            </section>
 
-              <section className="bg-blue-900/20 p-6 rounded-2xl border border-blue-900/30">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-blue-400 uppercase tracking-widest">Biometric Enrollment</h3>
-                  {selectedEmployee && (
-                    <Button
-                      type="button"
-                      onClick={() => setShowFaceModal(true)}
-                      className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {`Enroll Face for ${selectedEmployee.fullName}`}
-                    </Button>
-                  )}
+            <Separator />
+
+            <section>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Government IDs</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label>TIN *</Label>
+                  <Input name="tin" value={formData.tin} onChange={handleChange} required placeholder="000-000-000-000" />
                 </div>
-                <p className="text-xs text-blue-400/80">
-                  {selectedEmployee
-                    ? 'Enroll the employee\'s face for secure attendance verification.'
-                    : 'Face enrollment is only available for existing employees.'}
-                </p>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Bank Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Bank Name</Label>
-                    <Input name="bankName" value={formData.bankName} onChange={handleChange} placeholder="e.g. BDO, BPI, GCash" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold uppercase text-slate-400">Account Number</Label>
-                    <Input name="bankAccountNo" value={formData.bankAccountNo} onChange={handleChange} placeholder="0000000000" className="h-11 bg-slate-900 border-slate-700 text-white placeholder:text-slate-600" />
-                  </div>
+                <div className="space-y-2">
+                  <Label>SSS No. *</Label>
+                  <Input name="sssNo" value={formData.sssNo} onChange={handleChange} required placeholder="00-0000000-0" />
                 </div>
-              </section>
+                <div className="space-y-2">
+                  <Label>PhilHealth No. *</Label>
+                  <Input name="philhealthNo" value={formData.philhealthNo} onChange={handleChange} required placeholder="00-000000000-0" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pag-IBIG MID *</Label>
+                  <Input name="pagibigNo" value={formData.pagibigNo} onChange={handleChange} required placeholder="0000-0000-0000" />
+                </div>
+              </div>
+            </section>
 
-              <div className="flex gap-4 pt-4 sticky bottom-0 bg-slate-950 py-4 border-t border-slate-800">
-                <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1 h-12 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">Cancel</Button>
-                {userRole !== 'EMPLOYEE' && (
-                  <Button type="submit" className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white" disabled={createEmployee.isPending || updateEmployee.isPending}>
-                    {createEmployee.isPending || updateEmployee.isPending ? 'Saving...' : selectedEmployee ? 'Update Profile' : 'Create Employee'}
+            <Separator />
+
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Biometric Enrollment</h3>
+                {selectedEmployee && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFaceModal(true)}
+                  >
+                    Enroll Face
                   </Button>
                 )}
-                {userRole === 'EMPLOYEE' && (
-                  <Button type="button" onClick={() => { setShowModal(false); setShowFaceModal(true); }} className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white">Enroll Face</Button>
-                )}
               </div>
-            </form>
+              <p className="text-sm text-muted-foreground">
+                {selectedEmployee
+                  ? 'Enroll the employee\'s face for secure attendance verification.'
+                  : 'Face enrollment is only available for existing employees.'}
+              </p>
+            </section>
+
+            <Separator />
+
+            <section>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Bank Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label>Bank Name</Label>
+                  <Input name="bankName" value={formData.bankName} onChange={handleChange} placeholder="e.g. BDO, BPI, GCash" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Account Number</Label>
+                  <Input name="bankAccountNo" value={formData.bankAccountNo} onChange={handleChange} placeholder="0000000000" />
+                </div>
+              </div>
+            </section>
+
+            <div className="flex gap-4 pt-2">
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
+              {userRole !== 'EMPLOYEE' && (
+                <Button type="submit" className="flex-1" disabled={createEmployee.isPending || updateEmployee.isPending}>
+                  {createEmployee.isPending || updateEmployee.isPending ? 'Saving...' : selectedEmployee ? 'Update Profile' : 'Create Employee'}
+                </Button>
+              )}
+              {userRole === 'EMPLOYEE' && (
+                <Button type="button" onClick={() => { setShowModal(false); setShowFaceModal(true); }} className="flex-1">Enroll Face</Button>
+              )}
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 

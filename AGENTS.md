@@ -1,5 +1,33 @@
 # AGENTS.md - Developer Guidelines for HRIS Philippines
 
+## Completed Tasks
+
+### 13th Month Pay (DOLE-Compliant) — Jun 2026
+- Removed static `docs/13th-month-pay-guide.md`, replaced with functional page at `/thirteenth-month`
+- **DOLE Formula**: Total Basic Salary ÷ 12 (PD 851)
+- MONTHLY: `basicSalary × monthsWorked ÷ 12`; DAILY: `dailyRate × 26 days × monthsWorked ÷ 12`
+- Tax breakdown: first ₱90,000 non-taxable per TRAIN Law, excess taxable
+- DOLE compliance info panel with formula, coverage, exclusions, and deadline
+- Nav link updated from static guide to `/thirteenth-month`
+
+### Modern Dashboard Redesign — Jun 2026
+- Replaced basic stat cards with modern KPI cards with trend indicators and bottom accent bars
+- Added Recharts: BarChart (absenteeism by department), Donut Chart (attendance breakdown)
+- Department detail table with attendance rate badges (green ≥90%, amber ≥70%, red <70%)
+- Employee view with gradient status card and 3 mini stat cards
+- Skeleton loading animation (replaced spinner)
+- Dark mode compatible throughout
+- Fixed bug: `personalStats.department` was `undefined` (field name mismatch between API and hook)
+
+### Employee Dialog — shadcn/ui Style — Jun 2026
+- Removed dark theme (`bg-slate-950 text-white`) and all custom background sections
+- Replaced section backgrounds with `Separator` components
+- All inputs use default shadcn styling (no custom color overrides)
+- Consistent with the rest of the app's design system
+
+### Nav Cleanup — Jun 2026
+- Removed `Payroll Standards` nav link (static markdown doc)
+
 ## Technology Stack
 
 - **Framework**: Next.js 14 (React 18) — App Router

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban, List, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Clock, FileText, LogOut, Menu, UserCheck, CalendarDays, Timer, Wallet, Settings, Calendar, Award, ChevronDown, Printer, Building2, Building, FolderKanban, List, ShieldCheck, Calculator } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -64,6 +64,7 @@ const navItems = [
       { href: '/payroll', label: 'Payroll', icon: DollarSign, iconColor: 'text-violet-400' },
       { href: '/payroll/advances', label: 'Advances', icon: Wallet, iconColor: 'text-violet-400' },
       { href: '/payroll/advances-summary', label: 'Advances Summary', icon: DollarSign, iconColor: 'text-violet-400' },
+      { href: '/thirteenth-month', label: '13th Month Pay', icon: Calculator, iconColor: 'text-violet-400' },
     ],
   },
   {

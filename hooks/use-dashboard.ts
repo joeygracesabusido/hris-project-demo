@@ -10,6 +10,7 @@ export interface DashboardStats {
     isOnLeave: boolean
     employeeName: string
     department: string
+    subDepartment?: string
   }
 }
 
