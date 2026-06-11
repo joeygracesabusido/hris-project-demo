@@ -41,6 +41,10 @@ const EMPLOYEE_STATUSES = [
   { value: 'INACTIVE', label: 'Inactive' },
   { value: 'PROBATIONARY', label: 'Probationary' },
   { value: 'REGULAR', label: 'Regular' },
+  { value: 'PROJECT_BASED', label: 'Project Based' },
+  { value: 'ON_CALL', label: 'On-call' },
+  { value: 'CONTRACTUAL', label: 'Contractual' },
+  { value: 'FIXED_TERMS', label: 'Fixed Terms' },
   { value: 'RESIGNED', label: 'Resigned' },
   { value: 'TERMINATED', label: 'Terminated' },
 ];
@@ -525,11 +529,15 @@ export default function ThirteenthMonthPage() {
                             <Badge variant={
                               employee.employeeStatus === 'REGULAR' ? 'success' :
                               employee.employeeStatus === 'PROBATIONARY' ? 'warning' :
+                              employee.employeeStatus === 'PROJECT_BASED' ? 'default' :
+                              employee.employeeStatus === 'ON_CALL' ? 'outline' :
+                              employee.employeeStatus === 'CONTRACTUAL' ? 'secondary' :
+                              employee.employeeStatus === 'FIXED_TERMS' ? 'default' :
                               employee.employeeStatus === 'ACTIVE' ? 'success' :
                               employee.employeeStatus === 'INACTIVE' ? 'secondary' :
                               'outline'
                             }>
-                              {employee.employeeStatus || 'PROBATIONARY'}
+                              {(employee.employeeStatus || 'PROBATIONARY').replace(/_/g, ' ')}
                             </Badge>
                             <Badge variant={employee.isActive ? 'success' : 'secondary'} className="text-[10px]">
                               {employee.isActive ? 'Active' : 'Inactive'}

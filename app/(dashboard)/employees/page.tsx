@@ -270,9 +270,13 @@ export default function EmployeesPage() {
                       <Badge variant={
                         employee.employeeStatus === 'REGULAR' ? 'success' :
                         employee.employeeStatus === 'PROBATIONARY' ? 'warning' :
+                        employee.employeeStatus === 'PROJECT_BASED' ? 'default' :
+                        employee.employeeStatus === 'ON_CALL' ? 'outline' :
+                        employee.employeeStatus === 'CONTRACTUAL' ? 'secondary' :
+                        employee.employeeStatus === 'FIXED_TERMS' ? 'default' :
                         'secondary'
                       }>
-                        {employee.employeeStatus || 'PROBATIONARY'}
+                        {employee.employeeStatus?.replace(/_/g, ' ') || 'PROBATIONARY'}
                       </Badge>
                       <Badge variant={employee.isActive ? 'success' : 'secondary'}>
                         {employee.isActive ? 'Active' : 'Inactive'}
@@ -339,9 +343,13 @@ export default function EmployeesPage() {
                         <Badge variant={
                           employee.employeeStatus === 'REGULAR' ? 'success' :
                           employee.employeeStatus === 'PROBATIONARY' ? 'warning' :
+                          employee.employeeStatus === 'PROJECT_BASED' ? 'default' :
+                          employee.employeeStatus === 'ON_CALL' ? 'outline' :
+                          employee.employeeStatus === 'CONTRACTUAL' ? 'secondary' :
+                          employee.employeeStatus === 'FIXED_TERMS' ? 'default' :
                           'secondary'
                         }>
-                          {employee.employeeStatus || 'PROBATIONARY'}
+                          {employee.employeeStatus?.replace(/_/g, ' ') || 'PROBATIONARY'}
                         </Badge>
                         <Badge variant={employee.isActive ? 'success' : 'secondary'}>
                           {employee.isActive ? 'Active' : 'Inactive'}
@@ -472,6 +480,10 @@ export default function EmployeesPage() {
                     <SelectContent>
                       <SelectItem value="PROBATIONARY">Probationary</SelectItem>
                       <SelectItem value="REGULAR">Regular</SelectItem>
+                      <SelectItem value="PROJECT_BASED">Project Based</SelectItem>
+                      <SelectItem value="ON_CALL">On-call</SelectItem>
+                      <SelectItem value="CONTRACTUAL">Contractual</SelectItem>
+                      <SelectItem value="FIXED_TERMS">Fixed Terms</SelectItem>
                       <SelectItem value="RESIGNED">Resigned</SelectItem>
                       <SelectItem value="TERMINATED">Terminated</SelectItem>
                       <SelectItem value="ONDESIGN">On Designation</SelectItem>
