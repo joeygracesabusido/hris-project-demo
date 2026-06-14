@@ -167,13 +167,13 @@ export default function DashboardLayout({
           <Button
             variant="ghost"
             onClick={() => setOpen(!open)}
-            className={`w-full justify-between mb-1 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+            className={`w-full justify-between mb-1 hover:bg-white/10 hover:text-white transition-colors ${isActive ? 'bg-white/10 text-white font-medium' : 'text-slate-400'}`}
           >
             <div className="flex items-center gap-3">
-              <Icon className={`w-5 h-5 ${isActive ? 'text-accent-foreground' : item.iconColor}`} />
+              <Icon className={`w-5 h-5 ${isActive ? 'text-white' : item.iconColor}`} />
               <span>{item.label}</span>
             </div>
-            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''} text-muted-foreground`} />
+            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''} text-slate-500`} />
           </Button>
           {open && (item.subItems as NavItem[]).filter((subItem) => {
             if (subItem.adminOnly && userRole !== 'ADMIN' && userRole !== 'HR') {
@@ -188,10 +188,10 @@ export default function DashboardLayout({
                 key={subItem.href}
                 variant="ghost"
                 asChild
-                className={`w-full justify-start pl-10 mb-1 ${isSubActive ? 'bg-accent text-accent-foreground' : ''}`}
+                className={`w-full justify-start pl-10 mb-1 hover:bg-white/10 hover:text-white transition-colors ${isSubActive ? 'bg-white/10 text-white font-medium' : 'text-slate-400'}`}
               >
                 <Link href={subItem.href} onClick={() => setSidebarOpen(false)}>
-                  <SubIcon className={`w-4 h-4 ${isSubActive ? 'text-accent-foreground' : subItem.iconColor}`} />
+                  <SubIcon className={`w-4 h-4 ${isSubActive ? 'text-white' : subItem.iconColor}`} />
                   <span>{subItem.label}</span>
                 </Link>
               </Button>
@@ -207,10 +207,10 @@ export default function DashboardLayout({
         key={item.href}
         variant="ghost"
         asChild
-        className={`w-full justify-start mb-1 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+        className={`w-full justify-start mb-1 hover:bg-white/10 hover:text-white transition-colors ${isActive ? 'bg-white/10 text-white font-medium' : 'text-slate-400'}`}
       >
         <Link href={item.href} onClick={() => setSidebarOpen(false)}>
-          <Icon className={`w-5 h-5 ${isActive ? 'text-accent-foreground' : item.iconColor}`} />
+          <Icon className={`w-5 h-5 ${isActive ? 'text-white' : item.iconColor}`} />
           <span>{item.label}</span>
         </Link>
       </Button>
@@ -241,20 +241,18 @@ export default function DashboardLayout({
         </div>
 
         {/* Mobile Sheet sidebar */}
-        <SheetContent side="left" className="w-64 p-0 flex flex-col">
+        <SheetContent side="left" className="w-64 p-0 flex flex-col bg-slate-950 text-slate-400 border-r-slate-900">
           <div className="p-6">
-            <h1 className="text-xl font-bold">HRIS</h1>
-            <p className="text-sm text-muted-foreground">Philippines</p>
+            <h1 className="text-xl font-bold text-white">HRIS</h1>
+            <p className="text-sm text-slate-500">Philippines</p>
           </div>
 
           <nav className="flex-1 px-3 overflow-y-auto custom-scrollbar">
             {renderNavContent()}
           </nav>
 
-          <Separator />
-
-          <div className="p-3 flex items-center justify-between gap-2 bg-card">
-            <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-3 flex-1 justify-start">
+          <div className="p-3 flex items-center justify-between gap-2 border-t border-slate-900">
+            <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-3 flex-1 justify-start hover:bg-white/10 hover:text-white transition-colors">
               <LogOut className="w-5 h-5" />
               <span>Logout</span>
             </Button>
@@ -264,20 +262,18 @@ export default function DashboardLayout({
       </Sheet>
 
       {/* Desktop sidebar */}
-      <aside className="fixed top-0 left-0 z-50 h-full w-64 bg-card text-card-foreground border-r hidden lg:flex flex-col">
+      <aside className="fixed top-0 left-0 z-50 h-full w-64 bg-slate-950 text-slate-400 border-r border-slate-900 hidden lg:flex flex-col">
         <div className="p-6">
-          <h1 className="text-xl font-bold">HRIS</h1>
-          <p className="text-sm text-muted-foreground">Philippines</p>
+          <h1 className="text-xl font-bold text-white">HRIS</h1>
+          <p className="text-sm text-slate-500">Philippines</p>
         </div>
 
         <nav className="flex-1 px-3 overflow-y-auto custom-scrollbar">
           {renderNavContent()}
         </nav>
 
-        <Separator />
-
-        <div className="p-3 flex items-center justify-between gap-2 bg-card">
-          <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-3 flex-1 justify-start">
+        <div className="p-3 flex items-center justify-between gap-2 border-t border-slate-900">
+          <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-3 flex-1 justify-start hover:bg-white/10 hover:text-white transition-colors">
             <LogOut className="w-5 h-5" />
             <span>Logout</span>
           </Button>

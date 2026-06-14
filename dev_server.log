@@ -1,0 +1,36 @@
+
+> hris-philippines@1.0.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+- Environments: .env
+✓ Ready in 603ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+- Experiments (use with caution):
+  · cpus: 1
+
+○ Compiling /login ...
+ GET /login 200 in 7.3s (next.js: 6.5s, proxy.ts: 245ms, application-code: 527ms)
+ GET /login 200 in 110ms (next.js: 9ms, proxy.ts: 11ms, application-code: 90ms)
+ POST /api/login 200 in 3.5s (next.js: 639ms, proxy.ts: 14ms, application-code: 2.8s)
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 5.1s (next.js: 5.0s, proxy.ts: 9ms, application-code: 171ms)
+ GET /api/dashboard/stats 200 in 1569ms (next.js: 664ms, proxy.ts: 17ms, application-code: 888ms)
+[browser] `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog
+[browser] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+[browser] `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog
+[browser] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
