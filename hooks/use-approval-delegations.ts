@@ -53,6 +53,32 @@ export function useCreateDelegation() {
   })
 }
 
+export function useUpdateDelegation() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string } & Partial<DelegationData>) => {
+      const res = await fetch(`/api/approval-delegations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to update delegation')
+      return json
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['approval-delegations'] })
+      toast({ title: 'Delegation updated' })
+    },
+    onError: (err: Error) => {
+      toast({ variant: 'destructive', title: 'Error', description: err.message })
+    },
+  })
+}
+
 export function useDeleteDelegation() {
   const qc = useQueryClient()
   const { toast } = useToast()

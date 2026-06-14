@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react'
+import { ShieldCheck, ChevronDown, ChevronRight, Plus, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -14,6 +14,7 @@ import { useApprovalRules, type ApprovalRuleData } from '@/hooks/use-approval-ru
 import { useDelegations, type DelegationData } from '@/hooks/use-approval-delegations'
 import { useDepartments } from '@/hooks/use-departments'
 import { EditRuleModal } from '@/components/approver/edit-rule-modal'
+import { DelegationModal } from '@/components/approver/delegation-modal'
 
 const REQUEST_TYPES = ['LEAVE', 'OVERTIME', 'TRANSFER', 'EXPENSE'] as const
 const MAX_LEVELS = 3
@@ -21,7 +22,10 @@ const MAX_LEVELS = 3
 export default function ApproverPage() {
   const [userRole, setUserRole] = useState('')
   const [selectedRule, setSelectedRule] = useState<ApprovalRuleData | null>(null)
+  const [showNewRuleModal, setShowNewRuleModal] = useState(false)
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set())
+  const [selectedDelegation, setSelectedDelegation] = useState<DelegationData | null>(null)
+  const [showNewDelegationModal, setShowNewDelegationModal] = useState(false)
 
   useEffect(() => {
     const cookies = getClientCookies()
@@ -80,7 +84,15 @@ export default function ApproverPage() {
 
         <TabsContent value="rules">
           <Card>
-            <CardContent className="pt-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Approval Rules Matrix</CardTitle>
+              {isAdminOrHR && (
+                <Button onClick={() => setShowNewRuleModal(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-1" /> Add Rule
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="pt-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -118,13 +130,23 @@ export default function ApproverPage() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => setSelectedRule(rule)}
-                                      className="text-blue-600 hover:text-blue-800"
+                                      className="text-blue-600 hover:text-blue-800 text-xs"
                                     >
                                       {rule.approver?.fullName ?? '\u2014'}
                                     </Button>
                                   ) : (
-                                    <span>{rule.approver?.fullName ?? '\u2014'}</span>
+                                    <span className="text-xs">{rule.approver?.fullName ?? '\u2014'}</span>
                                   )
+                                ) : isAdminOrHR ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowNewRuleModal(true)}
+                                    className="text-muted-foreground hover:text-foreground"
+                                    title="Add rule"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
                                 ) : (
                                   <span className="text-muted-foreground">\u2014</span>
                                 )}
@@ -143,7 +165,15 @@ export default function ApproverPage() {
 
         <TabsContent value="delegations">
           <Card>
-            <CardContent className="pt-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Active Delegations</CardTitle>
+              {isAdminOrHR && (
+                <Button onClick={() => setShowNewDelegationModal(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-1" /> Add Delegation
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="pt-0">
               {delegations && delegations.length > 0 ? (
                 <Table>
                   <TableHeader>
@@ -153,6 +183,7 @@ export default function ApproverPage() {
                       <TableHead>Request Type</TableHead>
                       <TableHead>From</TableHead>
                       <TableHead>To</TableHead>
+                      {isAdminOrHR && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -163,6 +194,19 @@ export default function ApproverPage() {
                         <TableCell>{d.requestType ?? 'All'}</TableCell>
                         <TableCell>{new Date(d.delegationStart).toLocaleDateString()}</TableCell>
                         <TableCell>{new Date(d.delegationEnd).toLocaleDateString()}</TableCell>
+                        {isAdminOrHR && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedDelegation(d)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -175,8 +219,24 @@ export default function ApproverPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Edit existing rule modal */}
       {selectedRule && isAdminOrHR && (
         <EditRuleModal rule={selectedRule} onClose={() => setSelectedRule(null)} />
+      )}
+
+      {/* Create new rule modal */}
+      {showNewRuleModal && isAdminOrHR && (
+        <EditRuleModal onClose={() => setShowNewRuleModal(false)} />
+      )}
+
+      {/* Edit existing delegation modal */}
+      {selectedDelegation && isAdminOrHR && (
+        <DelegationModal delegation={selectedDelegation} onClose={() => setSelectedDelegation(null)} />
+      )}
+
+      {/* Create new delegation modal */}
+      {showNewDelegationModal && isAdminOrHR && (
+        <DelegationModal onClose={() => setShowNewDelegationModal(false)} />
       )}
     </div>
   )

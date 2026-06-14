@@ -1,6 +1,14 @@
 # AGENTS.md - Developer Guidelines for HRIS Philippines
 
 ## Completed Tasks
+### Approver & Delegation Management — Jun 2026
+- Added **"Add Rule"** button and empty-cell `+` buttons on Approval Rules matrix for admin/HR to create new rules
+- Added **"Add Delegation"** button and **edit (pencil)** actions on Delegations table for admin/HR
+- Created `DelegationModal` component (`components/approver/delegation-modal.tsx`) for add/edit delegation with approver/delegate selects, optional request type, and date range
+- Enhanced `EditRuleModal` with **Department** dropdown field, **create mode** support (no existing rule), and auto-close on successful save
+- Added missing `useUpdateDelegation` mutation hook for PATCH endpoint at `/api/approval-delegations/[id]`
+- Fixed "All Types" select option sending `"all"` string instead of `null` to the API
+
 
 ### 13th Month Pay (DOLE-Compliant) — Jun 2026
 - Removed static `docs/13th-month-pay-guide.md`, replaced with functional page at `/thirteenth-month`
